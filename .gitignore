@@ -1,0 +1,38 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+storage/logs/*
+!storage/logs/.gitkeep
+storage/tmp/*
+!storage/tmp/.gitkeep
+
+# Node
+node_modules/
+apps/web/node_modules/
+apps/web/dist/
+
+# PHP / Laravel
+vendor/
+apps/api/vendor/
+apps/api/storage/*.key
+apps/api/bootstrap/cache/*.php
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+services/scanner/.venv/
+services/scanner/venv/
+
+# IDE
+.vscode/
+.idea/

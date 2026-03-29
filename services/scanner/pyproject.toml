@@ -1,0 +1,5 @@
+[project]
+name = "signalcore-scanner"
+version = "0.1.0"
+description = "SignalCore scanner service"
+requires-python = ">=3.12"

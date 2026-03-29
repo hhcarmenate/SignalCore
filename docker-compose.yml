@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: signalcore-postgres
+    environment:
+      POSTGRES_DB: signalcore
+      POSTGRES_USER: signalcore
+      POSTGRES_PASSWORD: signalcore
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api/Dockerfile
+    container_name: signalcore-api
+    working_dir: /var/www/html
+    volumes:
+      - ./apps/api:/var/www/html
+    expose:
+      - "8000"
+    depends_on:
+      - postgres
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web/Dockerfile
+    container_name: signalcore-web
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    volumes:
+      - ./apps/web:/app
+      - signalcore_web_node_modules:/app/node_modules
+    expose:
+      - "5173"
+    depends_on:
+      - api
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: signalcore-nginx
+    depends_on:
+      - api
+      - web
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+
+  scanner:
+    build:
+      context: .
+      dockerfile: infra/docker/scanner/Dockerfile
+    container_name: signalcore-scanner
+    working_dir: /app
+    volumes:
+      - ./services/scanner:/app
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+  signalcore_web_node_modules:
