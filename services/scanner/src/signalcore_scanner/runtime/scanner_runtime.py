@@ -13,7 +13,7 @@ class ScannerRuntime:
         self.strategy_state_repository = strategy_state_repository
         self.watchlist_strategy_assignment_repository = watchlist_strategy_assignment_repository
 
-    def build_runtime_plan(self, watchlist_id: int) -> RuntimePlan:
+    def build_runtime_plan(self, watchlist_id: int, timeframe: str | None = None, batch_size: int = 50) -> RuntimePlan:
         available_strategy_keys = list(DEFAULT_STRATEGIES.keys())
         states = {state.strategy_key: state.is_enabled for state in self.strategy_state_repository.get_states()}
         globally_enabled_strategy_keys = [
@@ -36,4 +36,6 @@ class ScannerRuntime:
             globally_enabled_strategy_keys=globally_enabled_strategy_keys,
             assigned_strategy_keys=assigned_strategy_keys,
             enabled_strategy_keys=enabled_strategy_keys,
+            timeframe=timeframe,
+            batch_size=batch_size,
         )
