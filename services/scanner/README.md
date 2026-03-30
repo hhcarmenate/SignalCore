@@ -16,7 +16,7 @@ This service is structured to support the MVP scanner engine for:
 - Watchlists may execute one or many strategies.
 - Candle reads must be watchlist-scoped and timeframe-aware.
 - Shared logic must live outside individual strategies to keep the service DRY.
-- Data access, runtime orchestration, indicators, and market context must remain separated.
+- Data access, runtime orchestration, indicators, market context, and signal contracts must remain separated.
 
 ## Proposed package layout
 
@@ -50,8 +50,9 @@ The scanner runtime should:
 4. read watchlist strategy assignments from the database
 5. resolve strategy implementations from the registry
 6. build a candle access plan for the selected watchlist and timeframe
-7. execute only strategies assigned to the watchlist and enabled at the system level
-8. return normalized scanner outputs for persistence by downstream tasks
+7. pass a normalized input contract into each strategy
+8. collect normalized output contracts from each strategy
+9. return normalized scanner outputs for persistence by downstream tasks
 
 ## Strategy activation model
 
@@ -91,6 +92,50 @@ The current design splits responsibilities into:
 - a PostgreSQL-specific candle query builder
 
 This keeps SQL concerns out of strategy implementations and prepares the scanner for later performance tuning without rewriting every strategy.
+
+## Scanner input/output contracts
+
+Strategies should not receive raw database rows or free-form dictionaries.
+
+### Input contract
+Each strategy should receive a `StrategyExecutionInput` containing:
+- `strategy_key`
+- `watchlist_id`
+- `symbol`
+- `timeframe`
+- `candles`
+- `market_context`
+- `max_lookback`
+- `run_metadata`
+
+This ensures all strategies consume a consistent shape regardless of the data source.
+
+### Output contract
+Each strategy should return normalized `ScannerSignalOutput` entries wrapped in a `ScannerStrategyResult`.
+
+The signal payload contract now standardizes:
+- `strategy_key`
+- `symbol`
+- `timeframe`
+- `direction`
+- `thesis`
+- `confidence`
+- `score`
+- `signal_category`
+- `execution_hint`
+- `levels` (`entry`, `stop_loss`, `target`)
+- `indicators`
+- `context`
+- `metadata`
+
+This keeps strategy output stable for later persistence, ranking, and UI work.
+
+### Contract conventions
+- `thesis` should be human-readable and concise.
+- `confidence` and `score` should be numeric and explicit, not implied by wording.
+- `levels` should be optional but structurally consistent.
+- `indicators`, `context`, and `metadata` should hold machine-friendly supporting details.
+- per-strategy diagnostics should live on `ScannerStrategyResult`, not inside every signal unless required.
 
 ## Near-term follow-up tasks enabled by this structure
 

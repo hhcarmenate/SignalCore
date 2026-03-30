@@ -18,7 +18,7 @@ It also assumes strategy activation will be controlled from the dashboard throug
 2. Keep persistence ownership in Laravel and PostgreSQL.
 3. Allow strategies to be registered in code but toggled in the database.
 4. Allow each watchlist to execute one or many strategies.
-5. Separate data access, runtime orchestration, indicators, and market context.
+5. Separate data access, runtime orchestration, indicators, market context, and scanner contracts.
 6. Make downstream tasks (#25 through #33) fit naturally into the same service layout.
 
 ## Proposed project layout
@@ -39,8 +39,11 @@ services/scanner/
 |     |  |- candle_access_plan.py
 |     |  |- candle_point.py
 |     |  |- candle_query.py
+|     |  |- scanner_run_output.py
 |     |  |- scanner_run_request.py
+|     |  |- scanner_signal_output.py
 |     |  |- strategy_definition.py
+|     |  |- strategy_execution_input.py
 |     |  |- strategy_state.py
 |     |  |- watchlist_strategy_assignment.py
 |     |  \- watchlist_symbol.py
@@ -63,7 +66,8 @@ services/scanner/
 |     \- support/
 \- tests/
    |- test_candle_data_access.py
-   \- test_runtime_plan.py
+   |- test_runtime_plan.py
+   \- test_strategy_contracts.py
 ```
 
 ## Module responsibilities
@@ -94,9 +98,12 @@ Near-term responsibility:
 - watchlist strategy assignments
 - watchlist symbols
 - candle query contracts
+- strategy execution inputs
+- signal outputs
+- run outputs
 - scanner run request payloads
 
-This should become the foundation for Task #26.
+This is now the foundation for Task #26.
 
 ### `data_access/`
 Responsible for database-facing reads needed by the scanner.
@@ -168,6 +175,7 @@ Holds concrete strategy classes/modules.
 Important rule:
 - no direct database access in strategy implementations
 - strategies should consume normalized inputs from runtime/data-access layers
+- strategies should emit normalized outputs through scanner contracts
 
 ### `support/`
 Holds generic helpers that do not belong to scanner domain modules.
@@ -212,44 +220,47 @@ The PostgreSQL query builder uses a window-function pattern:
 
 This is the correct shape for scanner reads because strategies usually need the last X bars for each symbol in the watchlist, not the last X rows globally.
 
-### Performance notes
-For scanner-facing reads, the intended database behavior is:
-- filter by `symbol_id`
-- filter by `timeframe`
-- sort by `bar_time desc`
-- use the existing candles uniqueness/indexing strategy
+## Scanner input/output contracts
 
-This aligns with the current Laravel migration indexes:
-- `(symbol_id, timeframe, bar_time)`
-- `(timeframe, bar_time)`
+Strategies should not receive raw database rows or free-form dictionaries.
 
-Near-term rule:
-- scanner code should prefer batched watchlist reads over one query per symbol where practical
-- strategies must not issue ad hoc SQL on their own
+### Input contract
+Each strategy should receive a `StrategyExecutionInput` containing:
+- `strategy_key`
+- `watchlist_id`
+- `symbol`
+- `timeframe`
+- `candles`
+- `market_context`
+- `max_lookback`
+- `run_metadata`
 
-## Strategy activation architecture
+This ensures all strategies consume a consistent shape regardless of the data source.
 
-Strategies must be:
-- available in code
-- visible in the dashboard
-- enabled/disabled from the database
+### Output contract
+Each strategy should return normalized `ScannerSignalOutput` entries wrapped in a `ScannerStrategyResult` and aggregated by `ScannerRunOutput`.
 
-Therefore the scanner service should not decide active strategies from hardcoded if/else rules alone.
+The signal payload contract standardizes:
+- `strategy_key`
+- `symbol`
+- `timeframe`
+- `direction`
+- `thesis`
+- `confidence`
+- `score`
+- `signal_category`
+- `execution_hint`
+- `levels` (`entry`, `stop_loss`, `target`)
+- `indicators`
+- `context`
+- `metadata`
 
-## Watchlist execution architecture
-
-The runtime must support:
-- many watchlists
-- one strategy assigned to many watchlists
-- one watchlist assigned to many strategies
-
-The intended flow is:
-1. strategy registry defines what strategies exist
-2. database stores global enabled/disabled state per strategy
-3. database stores watchlist-to-strategy assignments
-4. dashboard updates both kinds of state
-5. scanner runtime reads both repositories
-6. execution plan includes only strategies assigned to the target watchlist and enabled globally
+### Contract conventions
+- `thesis` should be human-readable and concise.
+- `confidence` and `score` should be numeric and explicit, not implied by wording.
+- `levels` should be optional but structurally consistent.
+- `indicators`, `context`, and `metadata` should hold machine-friendly supporting details.
+- per-strategy diagnostics should live on `ScannerStrategyResult`, not inside every signal unless required.
 
 ## Why this matters now
 This avoids a bad architecture where:
@@ -258,12 +269,14 @@ This avoids a bad architecture where:
 - watchlists cannot customize strategy selection
 - every new strategy requires runtime rewiring
 - strategies become responsible for SQL and symbol-universe logic
+- every strategy invents a different signal payload shape
 
 Instead:
 - the registry defines availability
 - the database defines activation
 - watchlist assignments define scope
 - the data access layer defines read patterns
+- the contracts define execution boundaries
 - the runtime reconciles all of that before execution
 
 ## Boundaries with Laravel
@@ -292,21 +305,14 @@ For this phase, the repo should include:
 - a repository abstraction for watchlist symbol reads
 - a candle repository abstraction
 - a PostgreSQL query builder for candle lookbacks
+- stable strategy execution input/output contracts
 - tests proving watchlist assignment + enabled-state planning
 - tests proving candle access plan and lookback query behavior
+- tests proving signal payload and run output contract behavior
 
 That is enough structure to make the next scanner tasks incremental instead of architectural rewrites.
 
-## Required Laravel follow-up
-This architecture requires Laravel-owned schema support for at least:
-- a strategy catalog table
-- a watchlist-to-strategy assignment table
-- enabled/disabled state persisted in database records
-
-That schema work should be handled in a dedicated Laravel task so migrations remain ordered and owned by Laravel.
-
 ## Follow-up task mapping
-- #26 define formal scanner contracts inside `contracts/`
 - #27 build reusable indicators inside `indicators/`
 - #28 build context helpers inside `market_context/`
 - #29 extend orchestration inside `runtime/`
