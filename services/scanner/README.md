@@ -2,38 +2,34 @@
 
 Python service for SignalCore scanner execution and market analysis.
 
-## Current scope
+## Signal scoring and ranking model
 
-This service now includes a formal MVP scanner strategy set.
+The scanner now includes a reusable scoring and ranking layer for comparing generated signals.
 
-## MVP strategy set
+### Score dimensions
+The current MVP scoring model uses these dimensions:
+- trend alignment
+- confidence
+- volume confirmation
+- volatility quality
+- structure quality
 
-The current MVP strategy set is:
-1. `trend_continuation`
-2. `breakout_confirmation`
-3. `mean_reversion_to_trend`
+### Weighting approach
+Default weights:
+- trend alignment ? `0.30`
+- confidence ? `0.25`
+- structure quality ? `0.20`
+- volume confirmation ? `0.15`
+- volatility quality ? `0.10`
 
-### Priority order
-- Trend Continuation ? priority `1`
-- Breakout Confirmation ? priority `2`
-- Mean Reversion to Trend ? priority `3`
+### Output model
+Signals can now carry:
+- `score_breakdown`
+- `ranking_score`
+- `ranking_position`
 
-### Directional mapping
-Each MVP strategy supports both directional paths:
-- `bullish` ? `call`
-- `bearish` ? `put`
-
-This keeps the strategy layer aligned with SignalCore's options-oriented execution hints while still using equity candles and scanner logic as the source of truth.
-
-### Inclusion notes
-- these three strategies are included in MVP
-- each is enabled by default in the code registry
-- each is intended to work with the shared candle, indicator, context, and execution layers
-
-### Exclusion notes
-The following categories are explicitly excluded from MVP for now:
-- counter-trend reversal
-- range rotation
-- volatility expansion scalp
-
-Reason: they would increase complexity and weaken consistency before the core directional scanner flow is proven.
+### Rules
+- all scoring dimensions are normalized to a 0-100 scale before weighting
+- the weighted composite becomes the reusable ranking score baseline
+- ranking should sort highest-quality signals first
+- ties can fall back to confidence after ranking score
