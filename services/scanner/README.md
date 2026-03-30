@@ -2,34 +2,26 @@
 
 Python service for SignalCore scanner execution and market analysis.
 
-## Signal scoring and ranking model
+## Multi-timeframe confirmation rules
 
-The scanner now includes a reusable scoring and ranking layer for comparing generated signals.
+The scanner now includes a reusable multi-timeframe confirmation layer.
 
-### Score dimensions
-The current MVP scoring model uses these dimensions:
-- trend alignment
-- confidence
-- volume confirmation
-- volatility quality
-- structure quality
+### Current rule set
+- higher timeframe alignment scoring
+- trigger vs higher timeframe conflict filtering
+- minimum quality threshold enforcement
+- reusable confirmation result contract
 
-### Weighting approach
-Default weights:
-- trend alignment ? `0.30`
-- confidence ? `0.25`
-- structure quality ? `0.20`
-- volume confirmation ? `0.15`
-- volatility quality ? `0.10`
+### Current behavior
+A setup is confirmed only when:
+- the higher timeframe is aligned or at least not contradictory
+- no trend conflict is detected between trigger and higher timeframe contexts
+- the trigger score passes the minimum quality threshold
 
-### Output model
-Signals can now carry:
-- `score_breakdown`
-- `ranking_score`
-- `ranking_position`
-
-### Rules
-- all scoring dimensions are normalized to a 0-100 scale before weighting
-- the weighted composite becomes the reusable ranking score baseline
-- ranking should sort highest-quality signals first
-- ties can fall back to confidence after ranking score
+### Current output
+The confirmation layer returns:
+- `is_confirmed`
+- `alignment_score`
+- `conflict_detected`
+- `passed_minimum_threshold`
+- diagnostic notes
