@@ -4,48 +4,36 @@ Python service for SignalCore scanner execution and market analysis.
 
 ## Current scope
 
-This service now includes the scanner run tracking model on top of:
-- contracts
-- candle data access
-- indicators
-- market context
-- execution framework
+This service now includes a formal MVP scanner strategy set.
 
-## Run tracking model
+## MVP strategy set
 
-The run tracking layer now provides reusable primitives for:
-- scanner run records
-- run summaries
-- run-level errors
-- status classification from execution outcomes
+The current MVP strategy set is:
+1. `trend_continuation`
+2. `breakout_confirmation`
+3. `mean_reversion_to_trend`
 
-### Current tracking outputs
-- `ScannerRunRecord`
-- `ScannerRunSummary`
-- `ScannerRunError`
-- `ScannerRunTracker`
+### Priority order
+- Trend Continuation ? priority `1`
+- Breakout Confirmation ? priority `2`
+- Mean Reversion to Trend ? priority `3`
 
-### Current tracked fields
-- watchlist id
-- timeframe
-- status
-- started at
-- completed at
-- symbols scanned count
-- strategies executed count
-- signals found count
-- error count
-- execution metadata
-- normalized run errors
+### Directional mapping
+Each MVP strategy supports both directional paths:
+- `bullish` ? `call`
+- `bearish` ? `put`
 
-### Current status model
-- `completed`
-- `completed_with_errors`
-- `failed`
+This keeps the strategy layer aligned with SignalCore's options-oriented execution hints while still using equity candles and scanner logic as the source of truth.
 
-### Tracking rule
-The tracking layer is derived from execution reports.
-That means:
-- execution lifecycle and target failures happen in the execution framework
-- run records and summaries are built from those results
-- later persistence can store these records without changing strategy code
+### Inclusion notes
+- these three strategies are included in MVP
+- each is enabled by default in the code registry
+- each is intended to work with the shared candle, indicator, context, and execution layers
+
+### Exclusion notes
+The following categories are explicitly excluded from MVP for now:
+- counter-trend reversal
+- range rotation
+- volatility expansion scalp
+
+Reason: they would increase complexity and weaken consistency before the core directional scanner flow is proven.

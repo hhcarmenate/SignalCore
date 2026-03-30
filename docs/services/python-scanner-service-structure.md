@@ -1,44 +1,56 @@
 # Python Scanner Service Structure
 
 ## Status
-Scanner service structure and core execution building blocks defined through Tasks #24-#30.
+Scanner service structure and core strategy set defined through Tasks #24-#31.
 
-## Scanner run tracking model
+## MVP scanner strategy set
 
-Task #30 adds the reusable run tracking model used for auditing, visibility, and debugging.
+Task #31 formalizes the initial scanner strategies included in MVP.
 
-### Core tracking pieces
-- `ScannerRunTracker` converts execution reports into normalized run records
-- `ScannerRunRecord` captures one run with status, timestamps, metrics, metadata, and errors
-- `ScannerRunSummary` provides a compact reporting shape
-- `ScannerRunError` normalizes per-failure error details
+### Included in MVP
+1. `trend_continuation`
+2. `breakout_confirmation`
+3. `mean_reversion_to_trend`
 
-### Current tracked metrics
-- `symbols_scanned_count`
-- `strategies_executed_count`
-- `signals_found_count`
-- `error_count`
-- execution lifecycle event count in metadata
+### Priority order
+- `trend_continuation` ? 1
+- `breakout_confirmation` ? 2
+- `mean_reversion_to_trend` ? 3
 
-### Current status model
-- `completed`
-- `completed_with_errors`
-- `failed`
+### Directional mapping
+Each MVP strategy can produce:
+- bullish setups ? `call` execution hint
+- bearish setups ? `put` execution hint
 
-### Why this matters
-This gives the scanner a stable run-tracking shape before persistence is wired into Laravel or a database table.
+This preserves the product rule that the scanner logic is equity/ETF based while the output can still guide options-style execution.
 
-That means the next layers can evolve cleanly toward:
-- audit history
-- run monitor UI
-- scheduler visibility
-- debugging of partial failures
+### Inclusion rationale
+These strategies were chosen because together they cover the MVP directional workflow:
+- continuation when trend is already established
+- breakout when structure expansion confirms
+- pullback entry when mean reversion returns into the broader trend
 
-without forcing each strategy or executor to invent its own reporting format.
+### Explicit MVP exclusions
+The following categories are currently excluded:
+- counter-trend reversal
+- range rotation
+- volatility expansion scalp
 
-### Design rule
-Execution and tracking stay separated:
-- execution framework produces lifecycle + results + failures
-- run tracker transforms that into a stable run record
+These are intentionally out of scope for MVP because they would:
+- widen strategy behavior too early
+- complicate context interpretation
+- increase signal inconsistency before the core set is validated
 
-That separation keeps the code easier to test and easier to persist later.
+### Design outcome
+The strategy registry now carries useful MVP metadata such as:
+- priority
+- directional biases
+- execution hints
+- MVP inclusion flag
+- notes
+
+That metadata can later support:
+- dashboard display
+- default ordering
+- runtime prioritization
+- product documentation
