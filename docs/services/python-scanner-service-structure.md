@@ -56,6 +56,12 @@ services/scanner/
 |     |  |- watchlist_strategy_assignment_repository.py
 |     |  \- watchlist_symbol_repository.py
 |     |- indicators/
+|     |  |- atr.py
+|     |  |- exponential_moving_average.py
+|     |  |- indicator_calculator.py
+|     |  |- indicator_snapshot.py
+|     |  |- moving_averages.py
+|     |  \- rsi.py
 |     |- market_context/
 |     |- runtime/
 |     |  |- runtime_plan.py
@@ -121,13 +127,23 @@ This is now the foundation for Task #25.
 ### `indicators/`
 Holds reusable indicator calculations shared by multiple strategies.
 
-Examples:
-- moving averages
-- ATR
-- RSI
-- volume moving averages
+Current MVP coverage:
+- SMA 20
+- SMA 50
+- EMA 20
+- EMA 50
+- RSI 14
+- ATR 14
+- volume SMA 20
+- current close snapshot
 
-This should become the foundation for Task #27.
+Design rules:
+- low-level utilities should stay pure and series-based
+- high-level indicator aggregation should happen through `IndicatorCalculator`
+- the reusable output shape should be `IndicatorSnapshot`
+- strategies should consume shared snapshots instead of reimplementing formulas ad hoc
+
+This is now the foundation for Task #27.
 
 ### `market_context/`
 Holds reusable higher-level analysis helpers that are not strategy-specific.
@@ -205,21 +221,6 @@ The split is intentional:
 
 This keeps responsibilities cleaner and makes test coverage easier.
 
-### Query strategy
-The current design assumes:
-- scanner runs are watchlist-scoped
-- candles are filtered by timeframe
-- lookback is capped per symbol, not globally across the full result set
-- final-only reads are often desirable, but must remain configurable
-
-The PostgreSQL query builder uses a window-function pattern:
-- partition by `symbol_id, timeframe`
-- order by `bar_time desc`
-- apply `ROW_NUMBER()`
-- keep the latest `N` candles per symbol
-
-This is the correct shape for scanner reads because strategies usually need the last X bars for each symbol in the watchlist, not the last X rows globally.
-
 ## Scanner input/output contracts
 
 Strategies should not receive raw database rows or free-form dictionaries.
@@ -234,8 +235,6 @@ Each strategy should receive a `StrategyExecutionInput` containing:
 - `market_context`
 - `max_lookback`
 - `run_metadata`
-
-This ensures all strategies consume a consistent shape regardless of the data source.
 
 ### Output contract
 Each strategy should return normalized `ScannerSignalOutput` entries wrapped in a `ScannerStrategyResult` and aggregated by `ScannerRunOutput`.
@@ -255,12 +254,32 @@ The signal payload contract standardizes:
 - `context`
 - `metadata`
 
-### Contract conventions
-- `thesis` should be human-readable and concise.
-- `confidence` and `score` should be numeric and explicit, not implied by wording.
-- `levels` should be optional but structurally consistent.
-- `indicators`, `context`, and `metadata` should hold machine-friendly supporting details.
-- per-strategy diagnostics should live on `ScannerStrategyResult`, not inside every signal unless required.
+## Indicator computation architecture
+
+The indicator layer exists to prevent every strategy from calculating its own incompatible version of the same studies.
+
+### Core MVP indicators
+The current indicator layer standardizes:
+- simple moving averages (`sma_20`, `sma_50`)
+- exponential moving averages (`ema_20`, `ema_50`)
+- RSI (`rsi_14`)
+- ATR (`atr_14`)
+- volume moving average (`volume_sma_20`)
+- latest close snapshot
+
+### Boundaries
+- indicator utilities operate on normalized numeric series only
+- indicator utilities do not know about watchlists, SQL, or strategy toggles
+- `IndicatorCalculator` aggregates studies from candle inputs into a reusable snapshot
+- `IndicatorSnapshot` is the stable payload shape strategies can consume or embed in outputs
+
+### Reuse rules
+Strategies should reuse this layer for shared calculations instead of:
+- redefining EMA logic per strategy
+- inventing different RSI implementations
+- embedding ATR formulas inside setup-specific code
+
+That keeps the scanner more DRY, easier to test, and much less likely to drift into contradictory signals.
 
 ## Why this matters now
 This avoids a bad architecture where:
@@ -270,6 +289,7 @@ This avoids a bad architecture where:
 - every new strategy requires runtime rewiring
 - strategies become responsible for SQL and symbol-universe logic
 - every strategy invents a different signal payload shape
+- every strategy invents a different indicator formula
 
 Instead:
 - the registry defines availability
@@ -277,6 +297,7 @@ Instead:
 - watchlist assignments define scope
 - the data access layer defines read patterns
 - the contracts define execution boundaries
+- the indicator layer defines shared technical studies
 - the runtime reconciles all of that before execution
 
 ## Boundaries with Laravel
@@ -292,6 +313,7 @@ The Python scanner service remains responsible for:
 - reading normalized scanner inputs
 - building a valid execution plan per watchlist
 - building candle access plans per watchlist/timeframe/lookback
+- computing shared indicator snapshots
 - executing strategy logic
 - returning normalized scanner outputs
 
@@ -306,14 +328,15 @@ For this phase, the repo should include:
 - a candle repository abstraction
 - a PostgreSQL query builder for candle lookbacks
 - stable strategy execution input/output contracts
+- a reusable indicator computation layer and snapshot contract
 - tests proving watchlist assignment + enabled-state planning
 - tests proving candle access plan and lookback query behavior
 - tests proving signal payload and run output contract behavior
+- tests proving indicator utility and snapshot behavior
 
 That is enough structure to make the next scanner tasks incremental instead of architectural rewrites.
 
 ## Follow-up task mapping
-- #27 build reusable indicators inside `indicators/`
 - #28 build context helpers inside `market_context/`
 - #29 extend orchestration inside `runtime/`
 - #30 add run tracking integration points from `runtime/`

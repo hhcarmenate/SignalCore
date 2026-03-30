@@ -51,8 +51,49 @@ The scanner runtime should:
 5. resolve strategy implementations from the registry
 6. build a candle access plan for the selected watchlist and timeframe
 7. pass a normalized input contract into each strategy
-8. collect normalized output contracts from each strategy
-9. return normalized scanner outputs for persistence by downstream tasks
+8. compute shared indicators from candle inputs
+9. collect normalized output contracts from each strategy
+10. return normalized scanner outputs for persistence by downstream tasks
+
+## Indicator computation layer
+
+The indicator layer exists to prevent each strategy from recalculating or redefining common technical studies.
+
+### MVP indicator set
+The current MVP indicator layer supports:
+- `sma_20`
+- `sma_50`
+- `ema_20`
+- `ema_50`
+- `rsi_14`
+- `atr_14`
+- `volume_sma_20`
+- current `close`
+
+### Design rules
+- indicator functions operate on normalized numeric series
+- strategies should consume shared indicator snapshots, not reimplement formulas ad hoc
+- indicator utilities must not know about watchlists, strategy toggles, or SQL
+- indicator output should remain machine-friendly and serializable into scanner payloads
+
+### Current structure
+- low-level utilities:
+  - simple moving average
+  - exponential moving average
+  - RSI
+  - ATR
+- high-level aggregator:
+  - `IndicatorCalculator`
+- normalized result shape:
+  - `IndicatorSnapshot`
+
+### Why this matters
+This gives the scanner a single reusable indicator layer for:
+- trend continuation
+- breakout confirmation
+- mean reversion to trend
+
+Without this layer, every strategy would drift into its own slightly different formulas and thresholds, which is exactly how signal systems become inconsistent and annoying to debug.
 
 ## Strategy activation model
 
@@ -127,15 +168,6 @@ The signal payload contract now standardizes:
 - `indicators`
 - `context`
 - `metadata`
-
-This keeps strategy output stable for later persistence, ranking, and UI work.
-
-### Contract conventions
-- `thesis` should be human-readable and concise.
-- `confidence` and `score` should be numeric and explicit, not implied by wording.
-- `levels` should be optional but structurally consistent.
-- `indicators`, `context`, and `metadata` should hold machine-friendly supporting details.
-- per-strategy diagnostics should live on `ScannerStrategyResult`, not inside every signal unless required.
 
 ## Near-term follow-up tasks enabled by this structure
 
