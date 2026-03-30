@@ -5,10 +5,21 @@ from signalcore_scanner.contracts.watchlist_symbol import WatchlistSymbol
 
 
 @dataclass(frozen=True)
+class SwingLevels:
+    swing_high: float | None = None
+    swing_low: float | None = None
+    breakout_level: float | None = None
+    breakdown_level: float | None = None
+
+
+@dataclass(frozen=True)
 class MarketContextSnapshot:
     trend_bias: str | None = None
+    higher_timeframe_bias: str | None = None
     regime: str | None = None
     volatility_state: str | None = None
+    volume_state: str | None = None
+    swing_levels: SwingLevels = field(default_factory=SwingLevels)
     notes: tuple[str, ...] = ()
 
 

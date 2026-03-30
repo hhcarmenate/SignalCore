@@ -29,7 +29,7 @@ This service is structured to support the MVP scanner engine for:
 - `src/signalcore_scanner/indicators/`
   - reusable indicator computations shared by all strategies
 - `src/signalcore_scanner/market_context/`
-  - higher-level trend, structure, and regime helpers
+  - higher-level trend, structure, regime, swing, and volume context helpers
 - `src/signalcore_scanner/runtime/`
   - scanner runner, execution lifecycle, watchlist planning, and registry usage
 - `src/signalcore_scanner/strategies/`
@@ -52,8 +52,45 @@ The scanner runtime should:
 6. build a candle access plan for the selected watchlist and timeframe
 7. pass a normalized input contract into each strategy
 8. compute shared indicators from candle inputs
-9. collect normalized output contracts from each strategy
-10. return normalized scanner outputs for persistence by downstream tasks
+9. compute reusable market context from candles and indicators
+10. collect normalized output contracts from each strategy
+11. return normalized scanner outputs for persistence by downstream tasks
+
+## Market context and trend analysis layer
+
+The market context layer exists to keep higher-level interpretation out of individual strategies.
+
+### MVP context helpers
+The current layer now provides reusable helpers for:
+- trend bias detection
+- higher timeframe bias propagation
+- swing high / swing low detection
+- breakout and breakdown level definition
+- volatility and regime classification
+- volume context analysis
+
+### Current structure
+- `TrendBiasAnalyzer`
+- `SwingLevelDetector`
+- `RegimeClassifier`
+- `VolumeContextAnalyzer`
+- `MarketContextAnalyzer`
+- `TrendAnalysisResult`
+
+### Design rules
+- market context should consume normalized candles and indicator snapshots
+- market context should not know about watchlist assignments, dashboard toggles, or SQL
+- strategies should reuse shared context snapshots instead of redefining breakout levels or trend bias logic ad hoc
+- context outputs should be serializable and safe to embed in scanner payloads
+
+### Why this matters
+Without this layer, every strategy would invent its own idea of:
+- what bullish trend means
+- where the breakout level is
+- whether volatility is high or normal
+- whether volume is supportive
+
+That would produce inconsistent signals fast. This layer keeps those reusable decisions centralized.
 
 ## Indicator computation layer
 
@@ -94,80 +131,6 @@ This gives the scanner a single reusable indicator layer for:
 - mean reversion to trend
 
 Without this layer, every strategy would drift into its own slightly different formulas and thresholds, which is exactly how signal systems become inconsistent and annoying to debug.
-
-## Strategy activation model
-
-Strategies must be discoverable in code but controllable in the database.
-
-That means the service should support:
-- a code registry of available strategies
-- a database-backed enabled/disabled flag per strategy
-- a database-backed watchlist-to-strategy assignment layer
-- dashboard-driven state changes without Python code changes
-
-## Watchlist execution model
-
-The runtime must support:
-- many watchlists
-- one strategy assigned to many watchlists
-- one watchlist assigned to many strategies
-
-The effective execution set for a watchlist is:
-- strategies registered in code
-- intersected with globally enabled strategies
-- intersected with strategies assigned to the selected watchlist
-
-## Candle data access model
-
-The scanner data access layer must support:
-- resolving symbols from a watchlist once per run
-- reading candles by watchlist, timeframe, and lookback window
-- grouping results per symbol
-- choosing whether only final candles should be returned
-- batching reads instead of firing one database query per symbol when practical
-
-The current design splits responsibilities into:
-- a watchlist symbol repository
-- a candle access planner
-- a candle repository abstraction
-- a PostgreSQL-specific candle query builder
-
-This keeps SQL concerns out of strategy implementations and prepares the scanner for later performance tuning without rewriting every strategy.
-
-## Scanner input/output contracts
-
-Strategies should not receive raw database rows or free-form dictionaries.
-
-### Input contract
-Each strategy should receive a `StrategyExecutionInput` containing:
-- `strategy_key`
-- `watchlist_id`
-- `symbol`
-- `timeframe`
-- `candles`
-- `market_context`
-- `max_lookback`
-- `run_metadata`
-
-This ensures all strategies consume a consistent shape regardless of the data source.
-
-### Output contract
-Each strategy should return normalized `ScannerSignalOutput` entries wrapped in a `ScannerStrategyResult`.
-
-The signal payload contract now standardizes:
-- `strategy_key`
-- `symbol`
-- `timeframe`
-- `direction`
-- `thesis`
-- `confidence`
-- `score`
-- `signal_category`
-- `execution_hint`
-- `levels` (`entry`, `stop_loss`, `target`)
-- `indicators`
-- `context`
-- `metadata`
 
 ## Near-term follow-up tasks enabled by this structure
 

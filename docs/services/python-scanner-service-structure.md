@@ -63,6 +63,12 @@ services/scanner/
 |     |  |- moving_averages.py
 |     |  \- rsi.py
 |     |- market_context/
+|     |  |- market_context_analyzer.py
+|     |  |- regime.py
+|     |  |- swing_levels.py
+|     |  |- trend_analysis_result.py
+|     |  |- trend_bias.py
+|     |  \- volume_context.py
 |     |- runtime/
 |     |  |- runtime_plan.py
 |     |  \- scanner_runtime.py
@@ -72,6 +78,7 @@ services/scanner/
 |     \- support/
 \- tests/
    |- test_candle_data_access.py
+   |- test_indicator_computation.py
    |- test_runtime_plan.py
    \- test_strategy_contracts.py
 ```
@@ -148,13 +155,22 @@ This is now the foundation for Task #27.
 ### `market_context/`
 Holds reusable higher-level analysis helpers that are not strategy-specific.
 
-Examples:
-- trend direction
-- structure bias
-- support/resistance context
+Current MVP coverage:
+- trend bias detection
+- higher timeframe bias propagation
+- swing high / swing low detection
+- breakout and breakdown level derivation
+- volatility state classification
 - regime classification
+- volume context analysis
 
-This should become the foundation for Task #28.
+Design rules:
+- context helpers should consume normalized candles and indicator snapshots
+- context helpers should not know about watchlist assignments, SQL, or strategy toggles
+- high-level context aggregation should happen through `MarketContextAnalyzer`
+- the reusable output shape should be `MarketContextSnapshot`
+
+This is now the foundation for Task #28.
 
 ### `runtime/`
 Owns scanner orchestration and execution planning.
@@ -213,14 +229,6 @@ The intended read flow is:
 5. fetch candles grouped by symbol
 6. pass normalized candles to runtime / strategies
 
-### Why a planner + repository split
-The split is intentional:
-- `CandleAccessPlanner` decides what should be read
-- `CandleRepository` decides how candles are fetched
-- `PostgresCandleQueryBuilder` decides the SQL shape
-
-This keeps responsibilities cleaner and makes test coverage easier.
-
 ## Scanner input/output contracts
 
 Strategies should not receive raw database rows or free-form dictionaries.
@@ -239,21 +247,6 @@ Each strategy should receive a `StrategyExecutionInput` containing:
 ### Output contract
 Each strategy should return normalized `ScannerSignalOutput` entries wrapped in a `ScannerStrategyResult` and aggregated by `ScannerRunOutput`.
 
-The signal payload contract standardizes:
-- `strategy_key`
-- `symbol`
-- `timeframe`
-- `direction`
-- `thesis`
-- `confidence`
-- `score`
-- `signal_category`
-- `execution_hint`
-- `levels` (`entry`, `stop_loss`, `target`)
-- `indicators`
-- `context`
-- `metadata`
-
 ## Indicator computation architecture
 
 The indicator layer exists to prevent every strategy from calculating its own incompatible version of the same studies.
@@ -267,19 +260,33 @@ The current indicator layer standardizes:
 - volume moving average (`volume_sma_20`)
 - latest close snapshot
 
+## Market context and trend analysis architecture
+
+The market context layer exists to keep higher-level interpretation out of individual strategies.
+
+### Core MVP context helpers
+The current market context layer standardizes:
+- trend bias detection
+- higher timeframe bias propagation
+- swing high / swing low detection
+- breakout and breakdown level derivation
+- volatility state classification
+- regime classification
+- volume context analysis
+
 ### Boundaries
-- indicator utilities operate on normalized numeric series only
-- indicator utilities do not know about watchlists, SQL, or strategy toggles
-- `IndicatorCalculator` aggregates studies from candle inputs into a reusable snapshot
-- `IndicatorSnapshot` is the stable payload shape strategies can consume or embed in outputs
+- context helpers operate on normalized candle and indicator inputs only
+- context helpers do not know about watchlists, SQL, or strategy toggles
+- `MarketContextAnalyzer` aggregates reusable context into a stable snapshot
+- `MarketContextSnapshot` is the contract strategies can consume or embed in outputs
 
 ### Reuse rules
-Strategies should reuse this layer for shared calculations instead of:
-- redefining EMA logic per strategy
-- inventing different RSI implementations
-- embedding ATR formulas inside setup-specific code
+Strategies should reuse this layer instead of:
+- inventing their own trend bias logic
+- calculating separate breakout levels ad hoc
+- redefining volatility or volume context per strategy
 
-That keeps the scanner more DRY, easier to test, and much less likely to drift into contradictory signals.
+That keeps the scanner more DRY, more consistent, and far easier to debug when a signal looks wrong.
 
 ## Why this matters now
 This avoids a bad architecture where:
@@ -290,6 +297,7 @@ This avoids a bad architecture where:
 - strategies become responsible for SQL and symbol-universe logic
 - every strategy invents a different signal payload shape
 - every strategy invents a different indicator formula
+- every strategy invents a different trend/breakout definition
 
 Instead:
 - the registry defines availability
@@ -298,6 +306,7 @@ Instead:
 - the data access layer defines read patterns
 - the contracts define execution boundaries
 - the indicator layer defines shared technical studies
+- the market context layer defines shared interpretation helpers
 - the runtime reconciles all of that before execution
 
 ## Boundaries with Laravel
@@ -314,6 +323,7 @@ The Python scanner service remains responsible for:
 - building a valid execution plan per watchlist
 - building candle access plans per watchlist/timeframe/lookback
 - computing shared indicator snapshots
+- computing shared market context snapshots
 - executing strategy logic
 - returning normalized scanner outputs
 
@@ -329,15 +339,16 @@ For this phase, the repo should include:
 - a PostgreSQL query builder for candle lookbacks
 - stable strategy execution input/output contracts
 - a reusable indicator computation layer and snapshot contract
+- a reusable market context layer and snapshot contract
 - tests proving watchlist assignment + enabled-state planning
 - tests proving candle access plan and lookback query behavior
 - tests proving signal payload and run output contract behavior
 - tests proving indicator utility and snapshot behavior
+- tests proving market context utility and snapshot behavior
 
 That is enough structure to make the next scanner tasks incremental instead of architectural rewrites.
 
 ## Follow-up task mapping
-- #28 build context helpers inside `market_context/`
 - #29 extend orchestration inside `runtime/`
 - #30 add run tracking integration points from `runtime/`
 - #31 implement the three MVP strategies in `strategies/implementations/`
