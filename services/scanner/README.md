@@ -14,6 +14,7 @@ This service is structured to support the MVP scanner engine for:
 - Strategies live in Python code, but execution enable/disable state is controlled from the database.
 - The dashboard is the control surface for toggling strategies on and off.
 - Watchlists may execute one or many strategies.
+- Candle reads must be watchlist-scoped and timeframe-aware.
 - Shared logic must live outside individual strategies to keep the service DRY.
 - Data access, runtime orchestration, indicators, and market context must remain separated.
 
@@ -24,7 +25,7 @@ This service is structured to support the MVP scanner engine for:
 - `src/signalcore_scanner/contracts/`
   - scanner input/output contracts and protocol-style abstractions
 - `src/signalcore_scanner/data_access/`
-  - candle reads, watchlist assignment reads, and strategy state reads from PostgreSQL
+  - watchlist symbol reads, candle query planning, SQL query builders, and strategy state reads from PostgreSQL
 - `src/signalcore_scanner/indicators/`
   - reusable indicator computations shared by all strategies
 - `src/signalcore_scanner/market_context/`
@@ -48,8 +49,8 @@ The scanner runtime should:
 3. read globally enabled strategies from the database
 4. read watchlist strategy assignments from the database
 5. resolve strategy implementations from the registry
-6. execute only strategies assigned to the watchlist and enabled at the system level
-7. load candles and related context through the data access layer
+6. build a candle access plan for the selected watchlist and timeframe
+7. execute only strategies assigned to the watchlist and enabled at the system level
 8. return normalized scanner outputs for persistence by downstream tasks
 
 ## Strategy activation model
@@ -73,6 +74,23 @@ The effective execution set for a watchlist is:
 - strategies registered in code
 - intersected with globally enabled strategies
 - intersected with strategies assigned to the selected watchlist
+
+## Candle data access model
+
+The scanner data access layer must support:
+- resolving symbols from a watchlist once per run
+- reading candles by watchlist, timeframe, and lookback window
+- grouping results per symbol
+- choosing whether only final candles should be returned
+- batching reads instead of firing one database query per symbol when practical
+
+The current design splits responsibilities into:
+- a watchlist symbol repository
+- a candle access planner
+- a candle repository abstraction
+- a PostgreSQL-specific candle query builder
+
+This keeps SQL concerns out of strategy implementations and prepares the scanner for later performance tuning without rewriting every strategy.
 
 ## Near-term follow-up tasks enabled by this structure
 
