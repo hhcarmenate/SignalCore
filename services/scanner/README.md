@@ -4,46 +4,48 @@ Python service for SignalCore scanner execution and market analysis.
 
 ## Current scope
 
-This service is structured to support the MVP scanner engine for:
-- Trend Continuation
-- Breakout Confirmation
-- Mean Reversion to Trend
+This service now includes the scanner run tracking model on top of:
+- contracts
+- candle data access
+- indicators
+- market context
+- execution framework
 
-## Architecture principles
+## Run tracking model
 
-- Strategies live in Python code, but execution enable/disable state is controlled from the database.
-- Watchlists may execute one or many strategies.
-- Candle reads must be watchlist-scoped and timeframe-aware.
-- Shared logic must live outside individual strategies to keep the service DRY.
-- Data access, runtime orchestration, indicators, market context, and signal contracts must remain separated.
+The run tracking layer now provides reusable primitives for:
+- scanner run records
+- run summaries
+- run-level errors
+- status classification from execution outcomes
 
-## Execution framework
+### Current tracking outputs
+- `ScannerRunRecord`
+- `ScannerRunSummary`
+- `ScannerRunError`
+- `ScannerRunTracker`
 
-The execution framework now provides reusable building blocks for scanner runs:
-- `ScannerRuntime` for runtime planning
-- `ExecutionPlanner` for expanding runtime plans into execution targets and batches
-- `ScannerExecutionEngine` for batch execution with target-level error isolation
-- `ExecutionLifecycleState` for lifecycle event tracking
-- `ExecutionReport` for collecting results and failures
+### Current tracked fields
+- watchlist id
+- timeframe
+- status
+- started at
+- completed at
+- symbols scanned count
+- strategies executed count
+- signals found count
+- error count
+- execution metadata
+- normalized run errors
 
-### Current lifecycle states
-- `started`
-- `batch_started`
-- `target_started`
-- `target_completed`
-- `target_failed`
+### Current status model
 - `completed`
+- `completed_with_errors`
+- `failed`
 
-### Execution rules
-- runtime plans are watchlist- and timeframe-aware
-- enabled strategies are expanded into symbol-level execution targets
-- batching is controlled through `batch_size`
-- one failed target must not stop the rest of the run
-- lifecycle state is captured even when a target fails
-
-## Existing layers
-- contracts for strategy input/output
-- candle query and data access layer
-- indicator computation layer
-- market context layer
-- runtime execution framework
+### Tracking rule
+The tracking layer is derived from execution reports.
+That means:
+- execution lifecycle and target failures happen in the execution framework
+- run records and summaries are built from those results
+- later persistence can store these records without changing strategy code
