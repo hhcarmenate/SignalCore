@@ -39,6 +39,9 @@ class TradeSignal extends Model
         'invalidated_at',
         'actioned_at',
         'status_reason',
+        'queued_for_review_at',
+        'review_summary',
+        'review_notes',
     ];
 
     protected $casts = [
@@ -53,11 +56,13 @@ class TradeSignal extends Model
         'indicator_snapshot' => 'array',
         'market_context' => 'array',
         'metadata' => 'array',
+        'review_notes' => 'array',
         'signal_generated_at' => 'immutable_datetime',
         'expires_at' => 'immutable_datetime',
         'reviewed_at' => 'immutable_datetime',
         'invalidated_at' => 'immutable_datetime',
         'actioned_at' => 'immutable_datetime',
+        'queued_for_review_at' => 'immutable_datetime',
     ];
 
     protected $attributes = [
