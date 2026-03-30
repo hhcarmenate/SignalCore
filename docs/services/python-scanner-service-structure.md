@@ -1,64 +1,44 @@
 # Python Scanner Service Structure
 
 ## Status
-Scanner service structure and core execution building blocks defined through Tasks #24-#29.
+Scanner service structure and core execution building blocks defined through Tasks #24-#30.
 
-## Runtime execution framework
+## Scanner run tracking model
 
-Task #29 adds the reusable execution framework that coordinates strategy runs across watchlists, symbols, and timeframes.
+Task #30 adds the reusable run tracking model used for auditing, visibility, and debugging.
 
-### Core runtime pieces
-- `ScannerRuntime` builds the high-level runtime plan
-- `ExecutionPlanner` expands a runtime plan into execution targets and batches
-- `ScannerExecutionEngine` executes those targets with error isolation
-- `ExecutionLifecycleState` tracks lifecycle events for later observability/run tracking
-- `ExecutionReport` returns successful results plus failures without collapsing the full run
+### Core tracking pieces
+- `ScannerRunTracker` converts execution reports into normalized run records
+- `ScannerRunRecord` captures one run with status, timestamps, metrics, metadata, and errors
+- `ScannerRunSummary` provides a compact reporting shape
+- `ScannerRunError` normalizes per-failure error details
 
-### Batch execution model
-The current framework expands:
-- one watchlist
-- one timeframe
-- N enabled strategies
-- M symbols
+### Current tracked metrics
+- `symbols_scanned_count`
+- `strategies_executed_count`
+- `signals_found_count`
+- `error_count`
+- execution lifecycle event count in metadata
 
-into a sequence of execution targets.
-
-Those targets are then grouped into batches using the runtime plan batch size.
-
-This gives the system a clean path toward later:
-- parallel execution
-- worker distribution
-- queue-based orchestration
-- run monitoring
-
-without rewriting the shape of a scanner run.
-
-### Error isolation model
-The framework isolates failures per target.
-
-That means:
-- one broken symbol or strategy run is recorded as a failure
-- remaining targets continue to execute
-- lifecycle events still show where the failure happened
-- the final execution report includes both successes and failures
-
-This is critical for real scanner operation because one bad symbol payload or one strategy exception should not kill the whole batch.
-
-### Lifecycle definition
-Current lifecycle states:
-- `started`
-- `batch_started`
-- `target_started`
-- `target_completed`
-- `target_failed`
+### Current status model
 - `completed`
+- `completed_with_errors`
+- `failed`
 
-This is the base vocabulary for future run tracking and monitoring work in Task #30.
+### Why this matters
+This gives the scanner a stable run-tracking shape before persistence is wired into Laravel or a database table.
 
-### Design rules
-- runtime planning decides what should run
-- execution planning decides how targets are grouped
-- strategy executors decide how one target is evaluated
-- the execution engine coordinates lifecycle and failure isolation
+That means the next layers can evolve cleanly toward:
+- audit history
+- run monitor UI
+- scheduler visibility
+- debugging of partial failures
 
-Keeping those boundaries separate makes the framework easier to test and extend.
+without forcing each strategy or executor to invent its own reporting format.
+
+### Design rule
+Execution and tracking stay separated:
+- execution framework produces lifecycle + results + failures
+- run tracker transforms that into a stable run record
+
+That separation keeps the code easier to test and easier to persist later.
