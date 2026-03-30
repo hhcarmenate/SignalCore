@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\TradeSignalStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -34,6 +35,10 @@ class TradeSignal extends Model
         'metadata',
         'signal_generated_at',
         'expires_at',
+        'reviewed_at',
+        'invalidated_at',
+        'actioned_at',
+        'status_reason',
     ];
 
     protected $casts = [
@@ -50,6 +55,13 @@ class TradeSignal extends Model
         'metadata' => 'array',
         'signal_generated_at' => 'immutable_datetime',
         'expires_at' => 'immutable_datetime',
+        'reviewed_at' => 'immutable_datetime',
+        'invalidated_at' => 'immutable_datetime',
+        'actioned_at' => 'immutable_datetime',
+    ];
+
+    protected $attributes = [
+        'status' => TradeSignalStatus::New->value,
     ];
 
     public function watchlist(): BelongsTo
