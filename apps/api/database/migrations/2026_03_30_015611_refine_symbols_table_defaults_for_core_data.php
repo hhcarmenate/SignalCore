@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('symbols', function (Blueprint $table) {
-            //
+            $table->string('currency', 10)->nullable()->default('USD')->change();
         });
     }
 
@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('symbols', function (Blueprint $table) {
-            //
+            $table->string('currency', 10)->nullable()->default(null)->change();
         });
     }
 };
