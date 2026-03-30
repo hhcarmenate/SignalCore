@@ -1,48 +1,45 @@
 # Python Scanner Service Structure
 
 ## Status
-Scanner service structure and core strategy/scoring building blocks defined through Tasks #24-#32.
+Scanner service structure and core scanner-engine building blocks defined through Tasks #24-#33.
 
-## Signal scoring and ranking model
+## Multi-timeframe confirmation rules
 
-Task #32 adds the reusable scoring and ranking model used to compare generated signals.
+Task #33 adds the reusable confirmation rules used to improve signal quality across multiple timeframes.
 
-### Score dimensions
-The current model scores signals across:
-- trend alignment
-- confidence
-- volume confirmation
-- volatility quality
-- structure quality
+### Core pieces
+- `MultiTimeframeConfirmationInput`
+- `MultiTimeframeConfirmationResult`
+- `TrendAlignmentRule`
+- `ConflictFilter`
+- `MultiTimeframeConfirmer`
 
-### Default weighting
-- trend alignment ? `0.30`
-- confidence ? `0.25`
-- structure quality ? `0.20`
-- volume confirmation ? `0.15`
-- volatility quality ? `0.10`
+### Current rule set
+The confirmation layer currently evaluates:
+- higher timeframe bias alignment
+- trigger vs higher timeframe conflict
+- minimum score threshold
+- confirmation notes for diagnostics
 
-### Current scoring pieces
-- `SignalScoreInput`
-- `SignalScoreBreakdown`
-- `ScoreWeights`
-- `SignalScorer`
-- `SignalRanker`
+### Higher timeframe bias rule
+- bullish trigger wants bullish higher timeframe bias
+- bearish trigger wants bearish higher timeframe bias
+- neutral higher timeframe bias is treated as partial alignment
+- opposite higher timeframe bias is treated as misalignment
 
-### Ranking rules
-- scores are normalized into a weighted composite
-- signals are ranked by `ranking_score` when present, otherwise by `score`
-- confidence acts as a secondary tie-breaker
-- ranking assigns an explicit `ranking_position`
+### Conflict filtering rule
+A setup is filtered when the trigger/higher timeframe context contradicts the intended signal direction.
+
+### Minimum quality rule
+A setup must meet a minimum trigger score threshold to pass confirmation.
 
 ### Design outcome
-The scanner signal payload can now carry:
-- base score
-- ranking score
-- ranking position
-- structured score breakdown
+This gives the scanner a reusable confirmation layer before concrete strategy implementations become more complex.
 
-This prepares the scanner for:
-- prioritization in the dashboard
-- better monitoring of signal quality
-- clearer downstream filtering and review rules
+That matters because otherwise every strategy would invent its own version of:
+- what ?confirmed? means
+- when higher timeframe bias matters
+- how to reject conflicting setups
+- what minimum quality is acceptable
+
+Now those rules have a shared home.
