@@ -112,4 +112,9 @@ class TradeSignal extends Model
     {
         return $this->hasMany(self::class, 'replaces_trade_signal_id');
     }
+
+    public function audits(): HasMany
+    {
+        return $this->hasMany(TradeSignalAudit::class)->latest('occurred_at');
+    }
 }
