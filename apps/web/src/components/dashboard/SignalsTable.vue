@@ -38,11 +38,9 @@ const sortKey = ref<
   'symbol' | 'strategyLabel' | 'score' | 'confidence' | 'reviewPriority' | 'signalGeneratedAt' | 'status'
 >('reviewPriority')
 const sortDirection = ref<'asc' | 'desc'>('asc')
-const selectedSignalId = ref<string | null>(null)
 
 const compactSignals = computed(() => appStore.topSignals)
 const signals = computed(() => appStore.persistedSignals)
-const selectedSignal = computed(() => signals.value.find((signal) => signal.id === selectedSignalId.value) ?? null)
 
 const strategyOptions = computed<SelectOption[]>(() => [
   { value: 'all', label: 'All strategies' },
@@ -149,11 +147,6 @@ const pendingReviewCount = computed(
   () => sortedSignals.value.filter((signal) => signal.status === 'pending_review').length,
 )
 const resultLabel = computed(() => `${sortedSignals.value.length} signal${sortedSignals.value.length === 1 ? '' : 's'}`)
-const tableLayoutClass = computed(() =>
-  selectedSignal.value
-    ? 'grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1.9fr)_380px]'
-    : 'grid grid-cols-1 gap-5',
-)
 const activeFilterCount = computed(
   () =>
     Number(search.value.length > 0) +
@@ -176,10 +169,6 @@ function formatDate(value: string): string {
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date(value))
-}
-
-function formatPrice(value?: number): string {
-  return typeof value === 'number' ? `$${value.toFixed(2)}` : '--'
 }
 
 function badgeToneForDirection(direction: SignalDirection): 'success' | 'danger' {
@@ -224,7 +213,10 @@ function clearFilters() {
 }
 
 function openSignal(signal: PersistedSignalRecord) {
-  selectedSignalId.value = signal.id
+  void router.push({
+    name: 'signal-detail',
+    params: { id: signal.id },
+  })
 }
 
 async function hydrateSignals() {
@@ -261,13 +253,12 @@ watch(
       typeof query.priority === 'string' && query.priority.length > 0
         ? (query.priority.split(',') as ReviewPriority[])
         : []
-    selectedSignalId.value = typeof query.selected === 'string' ? query.selected : null
   },
   { immediate: true },
 )
 
 watch(
-  [search, selectedStrategy, selectedStatus, selectedDirections, selectedTimeframes, selectedPriorities, selectedSignalId],
+  [search, selectedStrategy, selectedStatus, selectedDirections, selectedTimeframes, selectedPriorities],
   () => {
     if (props.mode !== 'full') {
       return
@@ -282,7 +273,6 @@ watch(
         direction: selectedDirections.value.length > 0 ? selectedDirections.value.join(',') : undefined,
         timeframe: selectedTimeframes.value.length > 0 ? selectedTimeframes.value.join(',') : undefined,
         priority: selectedPriorities.value.length > 0 ? selectedPriorities.value.join(',') : undefined,
-        selected: selectedSignalId.value ?? undefined,
       },
     })
   },
@@ -303,7 +293,7 @@ onMounted(() => {
         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Priority feed</p>
         <h3 class="mt-1 text-lg font-semibold text-white">Top signals</h3>
       </div>
-      <button class="rounded-full border border-white/10 bg-white/6 px-3 py-2 text-sm text-white/80">View all</button>
+      <button class="rounded-full border border-white/10 bg-white/6 px-3 py-2 text-sm text-white/80" @click="router.push({ name: 'signals' })">View all</button>
     </div>
 
     <div class="overflow-x-auto">
@@ -320,7 +310,12 @@ onMounted(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="signal in compactSignals" :key="signal.id" class="border-b border-white/6 last:border-b-0">
+          <tr
+            v-for="signal in compactSignals"
+            :key="signal.id"
+            class="cursor-pointer border-b border-white/6 last:border-b-0 hover:bg-white/4"
+            @click="router.push({ name: 'signal-detail', params: { id: signal.id } })"
+          >
             <td class="px-3 py-3 font-semibold text-white">{{ signal.symbol }}</td>
             <td class="px-3 py-3">
               <StatusBadge :label="signal.directionLabel" :tone="signal.directionLabel === 'Bullish' ? 'success' : 'danger'" />
@@ -342,7 +337,7 @@ onMounted(() => {
         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Operator surface</p>
         <h2 class="mt-1 text-2xl font-semibold tracking-tight text-white">Persisted signals</h2>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-sc-muted">
-          Status and strategy now use dropdown filters, while the review table expands to consume the available width.
+          Review queue with route-backed navigation into the dedicated signal detail investigation page.
         </p>
       </div>
 
@@ -465,146 +460,74 @@ onMounted(() => {
       <button class="mt-4 rounded-full border border-white/10 bg-white/8 px-3 py-2 text-sm text-white/85" @click="clearFilters">Clear filters</button>
     </div>
 
-    <div v-else :class="tableLayoutClass">
-      <section class="overflow-hidden rounded-[24px] border border-white/10 bg-black/15">
-        <div class="flex flex-col gap-3 border-b border-white/8 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Queue</p>
-            <h3 class="mt-1 text-lg font-semibold text-white">Prioritized review list</h3>
-          </div>
-          <div class="inline-flex items-center gap-2 text-sm text-sc-muted">
-            <AppIcon name="ArrowUpDown" :size="15" />
-            <span>Click column labels to sort</span>
-          </div>
+    <section v-else class="overflow-hidden rounded-[24px] border border-white/10 bg-black/15">
+      <div class="flex flex-col gap-3 border-b border-white/8 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Queue</p>
+          <h3 class="mt-1 text-lg font-semibold text-white">Prioritized review list</h3>
         </div>
-
-        <div class="overflow-x-auto">
-          <table class="min-w-full table-auto border-collapse">
-            <thead>
-              <tr class="border-b border-white/8 text-left text-[11px] uppercase tracking-[0.14em] text-sc-muted">
-                <th class="px-4 py-3">
-                  <button class="text-inherit" type="button" @click="setSort('symbol')">Symbol</button>
-                </th>
-                <th class="px-4 py-3">
-                  <button class="text-inherit" type="button" @click="setSort('strategyLabel')">Strategy</button>
-                </th>
-                <th class="px-4 py-3">Direction</th>
-                <th class="px-4 py-3">Execution</th>
-                <th class="px-4 py-3">Timeframe</th>
-                <th class="px-4 py-3">
-                  <button class="text-inherit" type="button" @click="setSort('status')">Status</button>
-                </th>
-                <th class="px-4 py-3">
-                  <button class="text-inherit" type="button" @click="setSort('score')">Score</button>
-                </th>
-                <th class="px-4 py-3">
-                  <button class="text-inherit" type="button" @click="setSort('confidence')">Confidence</button>
-                </th>
-                <th class="px-4 py-3">
-                  <button class="text-inherit" type="button" @click="setSort('reviewPriority')">Priority</button>
-                </th>
-                <th class="px-4 py-3">
-                  <button class="text-inherit" type="button" @click="setSort('signalGeneratedAt')">Generated</button>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="signal in sortedSignals"
-                :key="signal.id"
-                class="cursor-pointer border-b border-white/6 transition hover:bg-white/4"
-                :class="selectedSignalId === signal.id ? 'bg-sc-primary-soft/80' : ''"
-                @click="openSignal(signal)"
-              >
-                <td class="px-4 py-3 align-top">
-                  <div class="flex flex-col gap-1">
-                    <strong class="text-sm font-semibold text-white">{{ signal.symbol }}</strong>
-                    <small class="text-xs text-sc-muted">#{{ signal.id.slice(-3) }}</small>
-                  </div>
-                </td>
-                <td class="px-4 py-3 align-top">
-                  <div class="flex flex-col gap-1">
-                    <strong class="text-sm font-medium text-white">{{ signal.strategyLabel }}</strong>
-                    <small class="text-xs text-sc-muted">{{ signal.strategyKey }}</small>
-                  </div>
-                </td>
-                <td class="px-4 py-3 align-top"><StatusBadge :label="formatLabel(signal.direction)" :tone="badgeToneForDirection(signal.direction)" /></td>
-                <td class="px-4 py-3 align-top"><StatusBadge :label="formatLabel(signal.executionHint)" tone="neutral" /></td>
-                <td class="px-4 py-3 align-top text-sm text-white/80">{{ signal.timeframe }}</td>
-                <td class="px-4 py-3 align-top"><StatusBadge :label="formatLabel(signal.status)" :tone="badgeToneForStatus(signal.status)" /></td>
-                <td class="px-4 py-3 align-top">
-                  <span class="inline-flex min-w-16 items-center justify-center rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-sm text-white">{{ signal.score }}</span>
-                </td>
-                <td class="px-4 py-3 align-top">
-                  <span class="inline-flex min-w-18 items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/85">{{ signal.confidence }}%</span>
-                </td>
-                <td class="px-4 py-3 align-top"><StatusBadge :label="formatLabel(signal.reviewPriority)" :tone="badgeToneForPriority(signal.reviewPriority)" /></td>
-                <td class="px-4 py-3 align-top">
-                  <div class="flex flex-col gap-1">
-                    <strong class="text-sm font-medium text-white">{{ formatDate(signal.signalGeneratedAt) }}</strong>
-                    <small class="text-xs text-sc-muted">review {{ signal.reviewScore }}</small>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="inline-flex items-center gap-2 text-sm text-sc-muted">
+          <AppIcon name="ArrowUpDown" :size="15" />
+          <span>Click column labels to sort · click a row to open detail</span>
         </div>
-      </section>
+      </div>
 
-      <aside v-if="selectedSignal" class="sticky top-6 flex h-fit flex-col gap-4 rounded-[24px] border border-white/10 bg-black/20 p-5">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Detail rail</p>
-            <h3 class="mt-1 text-lg font-semibold text-white">{{ selectedSignal.symbol }} - {{ selectedSignal.strategyLabel }}</h3>
-          </div>
-          <button class="rounded-full border border-white/10 bg-white/6 px-3 py-2 text-sm text-white/80" @click="selectedSignalId = null">Close</button>
-        </div>
-
-        <div class="flex flex-wrap gap-2">
-          <StatusBadge :label="formatLabel(selectedSignal.direction)" :tone="badgeToneForDirection(selectedSignal.direction)" />
-          <StatusBadge :label="formatLabel(selectedSignal.executionHint)" tone="neutral" />
-          <StatusBadge :label="formatLabel(selectedSignal.status)" :tone="badgeToneForStatus(selectedSignal.status)" />
-          <StatusBadge :label="formatLabel(selectedSignal.reviewPriority)" :tone="badgeToneForPriority(selectedSignal.reviewPriority)" />
-        </div>
-
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1 2xl:grid-cols-3">
-          <div class="rounded-2xl border border-sc-primary/25 bg-sc-primary-soft p-4">
-            <span class="text-xs uppercase tracking-[0.14em] text-sc-muted">Score</span>
-            <strong class="mt-2 block text-xl font-semibold text-white">{{ selectedSignal.score }}</strong>
-          </div>
-          <div class="rounded-2xl border border-white/10 bg-white/6 p-4">
-            <span class="text-xs uppercase tracking-[0.14em] text-sc-muted">Confidence</span>
-            <strong class="mt-2 block text-xl font-semibold text-white">{{ selectedSignal.confidence }}%</strong>
-          </div>
-          <div class="rounded-2xl border border-white/10 bg-white/6 p-4">
-            <span class="text-xs uppercase tracking-[0.14em] text-sc-muted">Generated</span>
-            <strong class="mt-2 block text-base font-semibold text-white">{{ formatDate(selectedSignal.signalGeneratedAt) }}</strong>
-          </div>
-        </div>
-
-        <section class="flex flex-col gap-2">
-          <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Thesis</p>
-          <p class="text-sm leading-6 text-white/78">{{ selectedSignal.thesis }}</p>
-        </section>
-
-        <section class="flex flex-col gap-3">
-          <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Levels</p>
-          <div class="grid grid-cols-3 gap-3">
-            <div class="rounded-2xl border border-white/10 bg-white/6 p-4">
-              <span class="text-xs uppercase tracking-[0.14em] text-sc-muted">Entry</span>
-              <strong class="mt-2 block text-base font-semibold text-white">{{ formatPrice(selectedSignal.entryPrice) }}</strong>
-            </div>
-            <div class="rounded-2xl border border-white/10 bg-white/6 p-4">
-              <span class="text-xs uppercase tracking-[0.14em] text-sc-muted">Stop</span>
-              <strong class="mt-2 block text-base font-semibold text-white">{{ formatPrice(selectedSignal.stopLoss) }}</strong>
-            </div>
-            <div class="rounded-2xl border border-white/10 bg-white/6 p-4">
-              <span class="text-xs uppercase tracking-[0.14em] text-sc-muted">Target</span>
-              <strong class="mt-2 block text-base font-semibold text-white">{{ formatPrice(selectedSignal.targetPrice) }}</strong>
-            </div>
-          </div>
-        </section>
-      </aside>
-    </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full table-auto border-collapse">
+          <thead>
+            <tr class="border-b border-white/8 text-left text-[11px] uppercase tracking-[0.14em] text-sc-muted">
+              <th class="px-4 py-3"><button class="text-inherit" type="button" @click="setSort('symbol')">Symbol</button></th>
+              <th class="px-4 py-3"><button class="text-inherit" type="button" @click="setSort('strategyLabel')">Strategy</button></th>
+              <th class="px-4 py-3">Direction</th>
+              <th class="px-4 py-3">Execution</th>
+              <th class="px-4 py-3">Timeframe</th>
+              <th class="px-4 py-3"><button class="text-inherit" type="button" @click="setSort('status')">Status</button></th>
+              <th class="px-4 py-3"><button class="text-inherit" type="button" @click="setSort('score')">Score</button></th>
+              <th class="px-4 py-3"><button class="text-inherit" type="button" @click="setSort('confidence')">Confidence</button></th>
+              <th class="px-4 py-3"><button class="text-inherit" type="button" @click="setSort('reviewPriority')">Priority</button></th>
+              <th class="px-4 py-3"><button class="text-inherit" type="button" @click="setSort('signalGeneratedAt')">Generated</button></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="signal in sortedSignals"
+              :key="signal.id"
+              class="cursor-pointer border-b border-white/6 transition hover:bg-white/4"
+              @click="openSignal(signal)"
+            >
+              <td class="px-4 py-3 align-top">
+                <div class="flex flex-col gap-1">
+                  <strong class="text-sm font-semibold text-white">{{ signal.symbol }}</strong>
+                  <small class="text-xs text-sc-muted">#{{ signal.id.slice(-3) }}</small>
+                </div>
+              </td>
+              <td class="px-4 py-3 align-top">
+                <div class="flex flex-col gap-1">
+                  <strong class="text-sm font-medium text-white">{{ signal.strategyLabel }}</strong>
+                  <small class="text-xs text-sc-muted">{{ signal.strategyKey }}</small>
+                </div>
+              </td>
+              <td class="px-4 py-3 align-top"><StatusBadge :label="formatLabel(signal.direction)" :tone="badgeToneForDirection(signal.direction)" /></td>
+              <td class="px-4 py-3 align-top"><StatusBadge :label="formatLabel(signal.executionHint)" tone="neutral" /></td>
+              <td class="px-4 py-3 align-top text-sm text-white/80">{{ signal.timeframe }}</td>
+              <td class="px-4 py-3 align-top"><StatusBadge :label="formatLabel(signal.status)" :tone="badgeToneForStatus(signal.status)" /></td>
+              <td class="px-4 py-3 align-top">
+                <span class="inline-flex min-w-16 items-center justify-center rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-sm text-white">{{ signal.score }}</span>
+              </td>
+              <td class="px-4 py-3 align-top">
+                <span class="inline-flex min-w-18 items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/85">{{ signal.confidence }}%</span>
+              </td>
+              <td class="px-4 py-3 align-top"><StatusBadge :label="formatLabel(signal.reviewPriority)" :tone="badgeToneForPriority(signal.reviewPriority)" /></td>
+              <td class="px-4 py-3 align-top">
+                <div class="flex flex-col gap-1">
+                  <strong class="text-sm font-medium text-white">{{ formatDate(signal.signalGeneratedAt) }}</strong>
+                  <small class="text-xs text-sc-muted">review {{ signal.reviewScore }}</small>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </div>
 </template>
