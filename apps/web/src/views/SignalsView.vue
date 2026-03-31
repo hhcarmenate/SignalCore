@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 
 import AppIcon from '../components/ui/AppIcon.vue'
-import BaseCard from '../components/ui/BaseCard.vue'
 import SignalsTable from '../components/dashboard/SignalsTable.vue'
 import { useAppStore } from '../stores/app'
 
@@ -50,51 +49,70 @@ const signalSummary = computed(() => {
     },
   ]
 })
+
+function toneClass(tone: string) {
+  if (tone === 'danger') return 'border-sc-danger/20 bg-sc-danger-soft text-sc-danger'
+  if (tone === 'warning') return 'border-sc-warning/20 bg-sc-warning-soft text-sc-warning'
+  if (tone === 'success') return 'border-sc-success/20 bg-sc-success-soft text-sc-success'
+  return 'border-white/10 bg-white/8 text-white/80'
+}
 </script>
 
 <template>
-  <section class="signals-page-shell">
-    <BaseCard class="signals-hero-card">
-      <div class="signals-hero-copy">
-        <p class="eyebrow">Dashboard and UI ? Task #99</p>
-        <h1 class="signals-hero-title">Signals review queue</h1>
-        <p class="signals-hero-subtitle">
-          Production-style triage surface for persisted signals, with scanability first and operator friction kept low.
-        </p>
-      </div>
+  <section class="flex flex-col gap-5">
+    <section
+      class="overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.18),transparent_28%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(17,24,39,0.88))] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.28)]"
+    >
+      <div class="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+        <div class="max-w-4xl">
+          <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-sc-muted">
+            Dashboard and UI ? Task #99
+          </p>
+          <h1 class="mt-2 text-4xl font-semibold tracking-tight text-white">Signals review queue</h1>
+          <p class="mt-3 max-w-3xl text-sm leading-6 text-sc-muted">
+            Production-ready triage surface for persisted signals, with clearer operator focus, lower filter friction,
+            and a denser table that actually earns the horizontal space.
+          </p>
+        </div>
 
-      <div class="signals-hero-actions">
-        <div class="signals-hero-pill">
-          <AppIcon name="DatabaseZap" :size="16" />
-          <span>Persisted feed</span>
-        </div>
-        <div class="signals-hero-pill muted">
-          <AppIcon name="SlidersHorizontal" :size="16" />
-          <span>Ops-first filtering</span>
+        <div class="flex flex-wrap items-center gap-3 xl:justify-end">
+          <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-3.5 py-2 text-sm text-white/85">
+            <AppIcon name="DatabaseZap" :size="16" />
+            <span>Persisted feed</span>
+          </div>
+          <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/4 px-3.5 py-2 text-sm text-white/70">
+            <AppIcon name="PanelTopClose" :size="16" />
+            <span>Dropdown filters</span>
+          </div>
+          <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/4 px-3.5 py-2 text-sm text-white/70">
+            <AppIcon name="StretchHorizontal" :size="16" />
+            <span>Full-width table</span>
+          </div>
         </div>
       </div>
-    </BaseCard>
-
-    <section class="signals-summary-grid">
-      <BaseCard
-        v-for="item in signalSummary"
-        :key="item.label"
-        class="signals-summary-card"
-        :class="[`tone-${item.tone}`]"
-      >
-        <div class="signals-summary-icon">
-          <AppIcon :name="item.icon" :size="18" />
-        </div>
-        <div>
-          <p class="signals-summary-label">{{ item.label }}</p>
-          <strong class="signals-summary-value">{{ item.value }}</strong>
-          <p class="signals-summary-footnote">{{ item.footnote }}</p>
-        </div>
-      </BaseCard>
     </section>
 
-    <BaseCard class="signals-main-card">
+    <section class="grid grid-cols-1 gap-4 xl:grid-cols-4">
+      <article
+        v-for="item in signalSummary"
+        :key="item.label"
+        class="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.22)]"
+      >
+        <div class="flex items-start gap-3">
+          <div class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border" :class="toneClass(item.tone)">
+            <AppIcon :name="item.icon" :size="18" />
+          </div>
+          <div>
+            <p class="text-sm text-sc-muted">{{ item.label }}</p>
+            <strong class="mt-1 block text-3xl font-semibold tracking-tight text-white">{{ item.value }}</strong>
+            <p class="mt-1 text-sm text-sc-muted">{{ item.footnote }}</p>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="rounded-[28px] border border-white/10 bg-white/4 p-5 shadow-[0_20px_50px_rgba(0,0,0,0.22)]">
       <SignalsTable mode="full" />
-    </BaseCard>
+    </section>
   </section>
 </template>

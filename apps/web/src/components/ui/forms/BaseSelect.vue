@@ -155,14 +155,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <label ref="rootRef" class="form-field custom-select-field">
-    <span v-if="label">{{ label }}</span>
+  <label ref="rootRef" class="relative flex min-w-0 flex-col gap-2 text-sm text-white/80">
+    <span v-if="label" class="text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">{{ label }}</span>
 
     <input v-if="name" type="hidden" :name="name" :value="modelValue" />
 
     <button
       ref="buttonRef"
-      class="custom-select-trigger"
+      class="flex min-h-11 w-full items-center justify-between rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-left text-sm text-white transition hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-sc-primary/50 disabled:cursor-not-allowed disabled:opacity-60"
       type="button"
       :disabled="disabled"
       :aria-expanded="isOpen"
@@ -172,16 +172,23 @@ onBeforeUnmount(() => {
       @focus="handleFocus"
       @keydown="handleKeydown"
     >
-      <span class="custom-select-value">{{ selectedOption?.label ?? 'Select an option' }}</span>
-      <span class="custom-select-chevron" aria-hidden="true">?</span>
+      <span class="truncate">{{ selectedOption?.label ?? 'Select an option' }}</span>
+      <span class="shrink-0 text-white/55" aria-hidden="true">?</span>
     </button>
 
-    <div v-if="isOpen" class="custom-select-menu card" role="listbox">
+    <div
+      v-if="isOpen"
+      class="absolute left-0 right-0 top-[calc(100%+8px)] z-20 rounded-2xl border border-white/10 bg-[#101827] p-2 shadow-2xl shadow-black/40"
+      role="listbox"
+    >
       <button
         v-for="(option, index) in options"
         :key="option.value"
-        class="custom-select-option"
-        :class="{ selected: option.value === modelValue, highlighted: index === highlightedIndex }"
+        class="block w-full rounded-xl px-3 py-2 text-left text-sm text-white/85 transition"
+        :class="[
+          option.value === modelValue ? 'bg-sc-primary text-white' : '',
+          index === highlightedIndex && option.value !== modelValue ? 'bg-white/8 text-white' : '',
+        ]"
         type="button"
         role="option"
         :aria-selected="option.value === modelValue"
