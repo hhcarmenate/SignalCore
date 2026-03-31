@@ -29,37 +29,50 @@ const router = useRouter()
 const loadState = ref<'loading' | 'ready' | 'error'>('loading')
 const errorMessage = ref('')
 const search = ref('')
-const selectedStrategy = ref('all')
-const selectedStatus = ref('all')
+const selectedSymbols = ref<string[]>([])
+const selectedStrategies = ref<string[]>([])
+const selectedStatuses = ref<SignalStatus[]>([])
 const selectedDirections = ref<SignalDirection[]>([])
 const selectedTimeframes = ref<string[]>([])
 const selectedPriorities = ref<ReviewPriority[]>([])
 const sortKey = ref<
-  'symbol' | 'strategyLabel' | 'score' | 'confidence' | 'reviewPriority' | 'signalGeneratedAt' | 'status'
+  'symbol' | 'strategyLabel' | 'reviewScore' | 'score' | 'confidence' | 'reviewPriority' | 'signalGeneratedAt' | 'status'
 >('reviewPriority')
 const sortDirection = ref<'asc' | 'desc'>('asc')
 
 const compactSignals = computed(() => appStore.topSignals)
 const signals = computed(() => appStore.persistedSignals)
 
-const strategyOptions = computed<SelectOption[]>(() => [
-  { value: 'all', label: 'All strategies' },
-  ...[...new Set(signals.value.map((signal) => signal.strategyLabel))].map((strategy) => ({
-    value: strategy,
-    label: strategy,
-  })),
+const symbolOptions = computed(() => [...new Set(signals.value.map((signal) => signal.symbol))].sort())
+const strategyOptions = computed(() => [...new Set(signals.value.map((signal) => signal.strategyLabel))].sort())
+const statusOptions = computed<SignalStatus[]>(() => [
+  'new',
+  'pending_review',
+  'accepted',
+  'rejected',
+  'expired',
+  'actioned',
+  'ignored',
 ])
-
-const statusOptions = computed<SelectOption[]>(() => [
-  { value: 'all', label: 'All statuses' },
-  ...(['new', 'pending_review', 'accepted', 'rejected', 'expired', 'actioned', 'ignored'] as SignalStatus[]).map(
-    (status) => ({ value: status, label: formatLabel(status) }),
-  ),
-])
-
 const directionOptions = computed<SignalDirection[]>(() => ['bullish', 'bearish'])
 const timeframeOptions = computed(() => [...new Set(signals.value.map((signal) => signal.timeframe))])
 const priorityOptions = computed<ReviewPriority[]>(() => ['high', 'medium', 'low'])
+
+const sortOptions = computed<SelectOption[]>(() => [
+  { value: 'reviewPriority', label: 'Default queue order' },
+  { value: 'reviewScore', label: 'Review score' },
+  { value: 'score', label: 'Score' },
+  { value: 'confidence', label: 'Confidence' },
+  { value: 'signalGeneratedAt', label: 'Generated time' },
+  { value: 'symbol', label: 'Symbol' },
+  { value: 'status', label: 'Status' },
+  { value: 'strategyLabel', label: 'Strategy' },
+])
+
+const sortDirectionOptions = computed<SelectOption[]>(() => [
+  { value: 'asc', label: 'Ascending' },
+  { value: 'desc', label: 'Descending' },
+])
 
 const priorityRank: Record<ReviewPriority, number> = {
   high: 0,
@@ -77,8 +90,10 @@ const filteredSignals = computed(() => {
       signal.strategyLabel.toLowerCase().includes(term) ||
       signal.strategyKey.toLowerCase().includes(term)
 
-    const matchesStrategy = selectedStrategy.value === 'all' || selectedStrategy.value === signal.strategyLabel
-    const matchesStatus = selectedStatus.value === 'all' || selectedStatus.value === signal.status
+    const matchesSymbol = selectedSymbols.value.length === 0 || selectedSymbols.value.includes(signal.symbol)
+    const matchesStrategy =
+      selectedStrategies.value.length === 0 || selectedStrategies.value.includes(signal.strategyLabel)
+    const matchesStatus = selectedStatuses.value.length === 0 || selectedStatuses.value.includes(signal.status)
     const matchesDirection =
       selectedDirections.value.length === 0 || selectedDirections.value.includes(signal.direction)
     const matchesTimeframe =
@@ -88,6 +103,7 @@ const filteredSignals = computed(() => {
 
     return (
       matchesSearch &&
+      matchesSymbol &&
       matchesStrategy &&
       matchesStatus &&
       matchesDirection &&
@@ -106,6 +122,9 @@ const sortedSignals = computed(() => {
     switch (sortKey.value) {
       case 'reviewPriority':
         comparison = priorityRank[left.reviewPriority] - priorityRank[right.reviewPriority]
+        break
+      case 'reviewScore':
+        comparison = left.reviewScore - right.reviewScore
         break
       case 'score':
         comparison = left.score - right.score
@@ -150,13 +169,23 @@ const resultLabel = computed(() => `${sortedSignals.value.length} signal${sorted
 const activeFilterCount = computed(
   () =>
     Number(search.value.length > 0) +
-    Number(selectedStrategy.value !== 'all') +
-    Number(selectedStatus.value !== 'all') +
+    Number(selectedSymbols.value.length > 0) +
+    Number(selectedStrategies.value.length > 0) +
+    Number(selectedStatuses.value.length > 0) +
     Number(selectedDirections.value.length > 0) +
     Number(selectedTimeframes.value.length > 0) +
     Number(selectedPriorities.value.length > 0),
 )
 const hasActiveFilters = computed(() => activeFilterCount.value > 0)
+
+const activeFilterChips = computed(() => [
+  ...selectedSymbols.value.map((value) => ({ group: 'symbol', value, label: `Symbol: ${value}` })),
+  ...selectedStrategies.value.map((value) => ({ group: 'strategy', value, label: `Strategy: ${value}` })),
+  ...selectedStatuses.value.map((value) => ({ group: 'status', value, label: `Status: ${formatLabel(value)}` })),
+  ...selectedDirections.value.map((value) => ({ group: 'direction', value, label: `Direction: ${formatLabel(value)}` })),
+  ...selectedTimeframes.value.map((value) => ({ group: 'timeframe', value, label: `Timeframe: ${value}` })),
+  ...selectedPriorities.value.map((value) => ({ group: 'priority', value, label: `Priority: ${formatLabel(value)}` })),
+])
 
 function formatLabel(value: string): string {
   return value.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase())
@@ -205,11 +234,21 @@ function setSort(nextKey: typeof sortKey.value) {
 
 function clearFilters() {
   search.value = ''
-  selectedStrategy.value = 'all'
-  selectedStatus.value = 'all'
+  selectedSymbols.value = []
+  selectedStrategies.value = []
+  selectedStatuses.value = []
   selectedDirections.value = []
   selectedTimeframes.value = []
   selectedPriorities.value = []
+}
+
+function removeFilter(group: string, value: string) {
+  if (group === 'symbol') selectedSymbols.value = selectedSymbols.value.filter((item) => item !== value)
+  if (group === 'strategy') selectedStrategies.value = selectedStrategies.value.filter((item) => item !== value)
+  if (group === 'status') selectedStatuses.value = selectedStatuses.value.filter((item) => item !== value)
+  if (group === 'direction') selectedDirections.value = selectedDirections.value.filter((item) => item !== value)
+  if (group === 'timeframe') selectedTimeframes.value = selectedTimeframes.value.filter((item) => item !== value)
+  if (group === 'priority') selectedPriorities.value = selectedPriorities.value.filter((item) => item !== value)
 }
 
 function openSignal(signal: PersistedSignalRecord) {
@@ -241,8 +280,11 @@ watch(
   () => route.query,
   (query) => {
     search.value = typeof query.search === 'string' ? query.search : ''
-    selectedStrategy.value = typeof query.strategy === 'string' && query.strategy.length > 0 ? query.strategy : 'all'
-    selectedStatus.value = typeof query.status === 'string' && query.status.length > 0 ? query.status : 'all'
+    selectedSymbols.value = typeof query.symbol === 'string' && query.symbol.length > 0 ? query.symbol.split(',') : []
+    selectedStrategies.value =
+      typeof query.strategy === 'string' && query.strategy.length > 0 ? query.strategy.split(',') : []
+    selectedStatuses.value =
+      typeof query.status === 'string' && query.status.length > 0 ? (query.status.split(',') as SignalStatus[]) : []
     selectedDirections.value =
       typeof query.direction === 'string' && query.direction.length > 0
         ? (query.direction.split(',') as SignalDirection[])
@@ -253,12 +295,27 @@ watch(
       typeof query.priority === 'string' && query.priority.length > 0
         ? (query.priority.split(',') as ReviewPriority[])
         : []
+    sortKey.value =
+      typeof query.sort === 'string' && query.sort.length > 0
+        ? (query.sort as typeof sortKey.value)
+        : 'reviewPriority'
+    sortDirection.value = query.order === 'desc' ? 'desc' : 'asc'
   },
   { immediate: true },
 )
 
 watch(
-  [search, selectedStrategy, selectedStatus, selectedDirections, selectedTimeframes, selectedPriorities],
+  [
+    search,
+    selectedSymbols,
+    selectedStrategies,
+    selectedStatuses,
+    selectedDirections,
+    selectedTimeframes,
+    selectedPriorities,
+    sortKey,
+    sortDirection,
+  ],
   () => {
     if (props.mode !== 'full') {
       return
@@ -268,11 +325,14 @@ watch(
       query: {
         ...route.query,
         search: search.value || undefined,
-        strategy: selectedStrategy.value !== 'all' ? selectedStrategy.value : undefined,
-        status: selectedStatus.value !== 'all' ? selectedStatus.value : undefined,
+        symbol: selectedSymbols.value.length > 0 ? selectedSymbols.value.join(',') : undefined,
+        strategy: selectedStrategies.value.length > 0 ? selectedStrategies.value.join(',') : undefined,
+        status: selectedStatuses.value.length > 0 ? selectedStatuses.value.join(',') : undefined,
         direction: selectedDirections.value.length > 0 ? selectedDirections.value.join(',') : undefined,
         timeframe: selectedTimeframes.value.length > 0 ? selectedTimeframes.value.join(',') : undefined,
         priority: selectedPriorities.value.length > 0 ? selectedPriorities.value.join(',') : undefined,
+        sort: sortKey.value !== 'reviewPriority' ? sortKey.value : undefined,
+        order: sortDirection.value !== 'asc' ? sortDirection.value : undefined,
       },
     })
   },
@@ -337,7 +397,7 @@ onMounted(() => {
         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Operator surface</p>
         <h2 class="mt-1 text-2xl font-semibold tracking-tight text-white">Persisted signals</h2>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-sc-muted">
-          Review queue with route-backed navigation into the dedicated signal detail investigation page.
+          Fast triage controls with visible active state, multi-select filters, and explicit queue ordering.
         </p>
       </div>
 
@@ -359,7 +419,7 @@ onMounted(() => {
 
     <section class="rounded-[24px] border border-white/10 bg-black/15 p-4">
       <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div class="grid flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.3fr)_220px_220px]">
+        <div class="grid flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1.4fr)_220px_180px]">
           <label class="flex flex-col gap-2">
             <span class="text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Search</span>
             <div class="relative">
@@ -373,8 +433,8 @@ onMounted(() => {
             </div>
           </label>
 
-          <BaseSelect v-model="selectedStatus" label="Status" :options="statusOptions" />
-          <BaseSelect v-model="selectedStrategy" label="Strategy" :options="strategyOptions" />
+          <BaseSelect v-model="sortKey" label="Sort by" :options="sortOptions" />
+          <BaseSelect v-model="sortDirection" label="Order" :options="sortDirectionOptions" />
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
@@ -385,52 +445,142 @@ onMounted(() => {
             <AppIcon name="SlidersHorizontal" :size="15" />
             <span>{{ activeFilterCount }} active filters</span>
           </div>
+          <div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70">
+            <AppIcon name="ArrowUpDown" :size="15" />
+            <span>{{ sortOptions.find((option) => option.value === sortKey)?.label }}</span>
+          </div>
           <button v-if="hasActiveFilters" class="rounded-full border border-white/10 bg-white/6 px-3 py-2 text-sm text-white/80" @click="clearFilters">Clear all</button>
           <button class="rounded-full border border-white/10 bg-white/6 px-3 py-2 text-sm text-white/80" @click="hydrateSignals">Refresh</button>
         </div>
       </div>
 
-      <div class="mt-4 flex flex-col gap-3">
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="min-w-28 text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Direction</span>
-          <button
-            v-for="direction in directionOptions"
-            :key="direction"
-            type="button"
-            class="rounded-full border px-3 py-2 text-sm transition"
-            :class="selectedDirections.includes(direction) ? 'border-sc-primary/30 bg-sc-primary-soft text-white' : 'border-white/10 bg-white/5 text-white/75 hover:border-white/20'"
-            @click="selectedDirections = toggleMultiValue(selectedDirections, direction)"
-          >
-            {{ formatLabel(direction) }}
-          </button>
+      <div v-if="activeFilterChips.length > 0" class="mt-4 flex flex-wrap gap-2">
+        <button
+          v-for="chip in activeFilterChips"
+          :key="`${chip.group}-${chip.value}`"
+          class="inline-flex items-center gap-2 rounded-full border border-sc-primary/25 bg-sc-primary-soft px-3 py-2 text-sm text-white"
+          @click="removeFilter(chip.group, chip.value)"
+        >
+          <span>{{ chip.label }}</span>
+          <AppIcon name="X" :size="14" />
+        </button>
+      </div>
+
+      <div class="mt-4 flex flex-col gap-4">
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-2">
+            <span class="min-w-28 text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Symbol</span>
+            <span class="text-xs text-sc-muted">Exact ticker multi-select</span>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="symbol in symbolOptions"
+              :key="symbol"
+              type="button"
+              class="rounded-full border px-3 py-2 text-sm transition"
+              :class="selectedSymbols.includes(symbol) ? 'border-sc-primary/30 bg-sc-primary-soft text-white' : 'border-white/10 bg-white/5 text-white/75 hover:border-white/20'"
+              @click="selectedSymbols = toggleMultiValue(selectedSymbols, symbol)"
+            >
+              {{ symbol }}
+            </button>
+          </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="min-w-28 text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Timeframe</span>
-          <button
-            v-for="timeframe in timeframeOptions"
-            :key="timeframe"
-            type="button"
-            class="rounded-full border px-3 py-2 text-sm transition"
-            :class="selectedTimeframes.includes(timeframe) ? 'border-sc-primary/30 bg-sc-primary-soft text-white' : 'border-white/10 bg-white/5 text-white/75 hover:border-white/20'"
-            @click="selectedTimeframes = toggleMultiValue(selectedTimeframes, timeframe)"
-          >
-            {{ timeframe }}
-          </button>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-2">
+            <span class="min-w-28 text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Strategy</span>
+            <span class="text-xs text-sc-muted">Multi-select</span>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="strategy in strategyOptions"
+              :key="strategy"
+              type="button"
+              class="rounded-full border px-3 py-2 text-sm transition"
+              :class="selectedStrategies.includes(strategy) ? 'border-sc-primary/30 bg-sc-primary-soft text-white' : 'border-white/10 bg-white/5 text-white/75 hover:border-white/20'"
+              @click="selectedStrategies = toggleMultiValue(selectedStrategies, strategy)"
+            >
+              {{ strategy }}
+            </button>
+          </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="min-w-28 text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Priority</span>
-          <button
-            v-for="priority in priorityOptions"
-            :key="priority"
-            type="button"
-            class="rounded-full border px-3 py-2 text-sm transition"
-            :class="selectedPriorities.includes(priority) ? 'border-sc-primary/30 bg-sc-primary-soft text-white' : 'border-white/10 bg-white/5 text-white/75 hover:border-white/20'"
-            @click="selectedPriorities = toggleMultiValue(selectedPriorities, priority)"
-          >
-            {{ formatLabel(priority) }}
-          </button>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-2">
+            <span class="min-w-28 text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Status</span>
+            <span class="text-xs text-sc-muted">Multi-select</span>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="status in statusOptions"
+              :key="status"
+              type="button"
+              class="rounded-full border px-3 py-2 text-sm transition"
+              :class="selectedStatuses.includes(status) ? 'border-sc-primary/30 bg-sc-primary-soft text-white' : 'border-white/10 bg-white/5 text-white/75 hover:border-white/20'"
+              @click="selectedStatuses = toggleMultiValue(selectedStatuses, status)"
+            >
+              {{ formatLabel(status) }}
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <div class="flex flex-col gap-3">
+            <div class="flex items-center gap-2">
+              <span class="min-w-28 text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Direction</span>
+              <span class="text-xs text-sc-muted">Quick toggle</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="direction in directionOptions"
+                :key="direction"
+                type="button"
+                class="rounded-full border px-3 py-2 text-sm transition"
+                :class="selectedDirections.includes(direction) ? 'border-sc-primary/30 bg-sc-primary-soft text-white' : 'border-white/10 bg-white/5 text-white/75 hover:border-white/20'"
+                @click="selectedDirections = toggleMultiValue(selectedDirections, direction)"
+              >
+                {{ formatLabel(direction) }}
+              </button>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-3">
+            <div class="flex items-center gap-2">
+              <span class="min-w-28 text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Timeframe</span>
+              <span class="text-xs text-sc-muted">Quick toggle</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="timeframe in timeframeOptions"
+                :key="timeframe"
+                type="button"
+                class="rounded-full border px-3 py-2 text-sm transition"
+                :class="selectedTimeframes.includes(timeframe) ? 'border-sc-primary/30 bg-sc-primary-soft text-white' : 'border-white/10 bg-white/5 text-white/75 hover:border-white/20'"
+                @click="selectedTimeframes = toggleMultiValue(selectedTimeframes, timeframe)"
+              >
+                {{ timeframe }}
+              </button>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-3">
+            <div class="flex items-center gap-2">
+              <span class="min-w-28 text-[11px] font-semibold uppercase tracking-[0.14em] text-sc-muted">Priority</span>
+              <span class="text-xs text-sc-muted">Queue weight</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="priority in priorityOptions"
+                :key="priority"
+                type="button"
+                class="rounded-full border px-3 py-2 text-sm transition"
+                :class="selectedPriorities.includes(priority) ? 'border-sc-primary/30 bg-sc-primary-soft text-white' : 'border-white/10 bg-white/5 text-white/75 hover:border-white/20'"
+                @click="selectedPriorities = toggleMultiValue(selectedPriorities, priority)"
+              >
+                {{ formatLabel(priority) }}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -468,7 +618,7 @@ onMounted(() => {
         </div>
         <div class="inline-flex items-center gap-2 text-sm text-sc-muted">
           <AppIcon name="ArrowUpDown" :size="15" />
-          <span>Click column labels to sort · click a row to open detail</span>
+          <span>Route-backed sorting and filtering · click a row to open detail</span>
         </div>
       </div>
 
@@ -482,6 +632,7 @@ onMounted(() => {
               <th class="px-4 py-3">Execution</th>
               <th class="px-4 py-3">Timeframe</th>
               <th class="px-4 py-3"><button class="text-inherit" type="button" @click="setSort('status')">Status</button></th>
+              <th class="px-4 py-3"><button class="text-inherit" type="button" @click="setSort('reviewScore')">Review</button></th>
               <th class="px-4 py-3"><button class="text-inherit" type="button" @click="setSort('score')">Score</button></th>
               <th class="px-4 py-3"><button class="text-inherit" type="button" @click="setSort('confidence')">Confidence</button></th>
               <th class="px-4 py-3"><button class="text-inherit" type="button" @click="setSort('reviewPriority')">Priority</button></th>
@@ -512,6 +663,9 @@ onMounted(() => {
               <td class="px-4 py-3 align-top text-sm text-white/80">{{ signal.timeframe }}</td>
               <td class="px-4 py-3 align-top"><StatusBadge :label="formatLabel(signal.status)" :tone="badgeToneForStatus(signal.status)" /></td>
               <td class="px-4 py-3 align-top">
+                <span class="inline-flex min-w-16 items-center justify-center rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-sm text-white">{{ signal.reviewScore }}</span>
+              </td>
+              <td class="px-4 py-3 align-top">
                 <span class="inline-flex min-w-16 items-center justify-center rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-sm text-white">{{ signal.score }}</span>
               </td>
               <td class="px-4 py-3 align-top">
@@ -521,7 +675,7 @@ onMounted(() => {
               <td class="px-4 py-3 align-top">
                 <div class="flex flex-col gap-1">
                   <strong class="text-sm font-medium text-white">{{ formatDate(signal.signalGeneratedAt) }}</strong>
-                  <small class="text-xs text-sc-muted">review {{ signal.reviewScore }}</small>
+                  <small class="text-xs text-sc-muted">{{ sortKey === 'reviewPriority' ? 'default queue' : 'custom sort' }}</small>
                 </div>
               </td>
             </tr>
