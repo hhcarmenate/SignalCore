@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class TradeSignal extends Model
 {
@@ -121,5 +122,10 @@ class TradeSignal extends Model
     public function audits(): HasMany
     {
         return $this->hasMany(TradeSignalAudit::class)->latest('occurred_at');
+    }
+
+    public function outcome(): HasOne
+    {
+        return $this->hasOne(TradeSignalOutcome::class);
     }
 }
