@@ -6,3 +6,4 @@ High-level architecture, service boundaries, and runtime flow documentation.
 - [Local Development Environment Architecture](./local-development-environment-architecture.md)
 - [Scheduler and Background Job Architecture](./scheduler-background-job-architecture.md)
 - [Logging and Observability Baseline](./logging-observability-baseline.md)
+- [Configuration and Environment Management Rules](./configuration-environment-management-rules.md)
