@@ -12,7 +12,15 @@ SignalCore is a modular signal detection platform focused initially on stock-bas
 - Docker-based local development
 
 ## Documentation
-- `docs/database/` → initial database design documentation
+- `docs/database/` -> initial database design documentation
+- `docs/architecture/` -> runtime, platform, and service-boundary architecture
+- `docs/product/` -> feature and product requirements
+
+## Local development quickstart
+- Start stack: `infra/scripts/dev/up.sh`
+- Stop stack: `infra/scripts/dev/down.sh`
+- Status: `infra/scripts/dev/status.sh`
+- Run API migrations: `infra/scripts/dev/migrate-api.sh`
 
 ## Status
 Planning and architecture phase.
