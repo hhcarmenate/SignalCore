@@ -9,6 +9,7 @@ use App\Enums\OptionExerciseStyle;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class OptionContract extends Model
 {
@@ -59,5 +60,10 @@ class OptionContract extends Model
     public function underlyingSymbol(): BelongsTo
     {
         return $this->belongsTo(Symbol::class, 'underlying_symbol_id');
+    }
+
+    public function snapshots(): HasMany
+    {
+        return $this->hasMany(OptionChainSnapshot::class);
     }
 }
