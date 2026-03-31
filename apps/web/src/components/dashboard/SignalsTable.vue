@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import AppIcon from '../ui/AppIcon.vue'
 import {
   useAppStore,
   type PersistedSignalRecord,
@@ -137,16 +138,23 @@ const sortedSignals = computed(() => {
   return items
 })
 
-const resultLabel = computed(() => `${sortedSignals.value.length} signal${sortedSignals.value.length === 1 ? '' : 's'}`)
-const hasActiveFilters = computed(
-  () =>
-    search.value.length > 0 ||
-    selectedStrategies.value.length > 0 ||
-    selectedStatuses.value.length > 0 ||
-    selectedDirections.value.length > 0 ||
-    selectedTimeframes.value.length > 0 ||
-    selectedPriorities.value.length > 0,
+const highPriorityCount = computed(
+  () => sortedSignals.value.filter((signal) => signal.reviewPriority === 'high').length,
 )
+const pendingReviewCount = computed(
+  () => sortedSignals.value.filter((signal) => signal.status === 'pending_review').length,
+)
+const resultLabel = computed(() => `${sortedSignals.value.length} signal${sortedSignals.value.length === 1 ? '' : 's'}`)
+const activeFilterCount = computed(
+  () =>
+    Number(search.value.length > 0) +
+    Number(selectedStrategies.value.length > 0) +
+    Number(selectedStatuses.value.length > 0) +
+    Number(selectedDirections.value.length > 0) +
+    Number(selectedTimeframes.value.length > 0) +
+    Number(selectedPriorities.value.length > 0),
+)
+const hasActiveFilters = computed(() => activeFilterCount.value > 0)
 
 function formatLabel(value: string): string {
   return value.replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase())
@@ -323,99 +331,123 @@ onMounted(() => {
   </div>
 
   <div v-else class="signals-list-view">
-    <div class="signals-page-header">
-      <SectionHeader eyebrow="Signal Ops" title="Persisted signals" />
+    <div class="signals-ops-header">
+      <div>
+        <p class="eyebrow">Operator surface</p>
+        <h2 class="signals-ops-title">Persisted signals</h2>
+        <p class="signals-ops-copy">
+          Review queue ordered for actionability, with fast filtering and a persistent detail rail for deeper inspection.
+        </p>
+      </div>
 
-      <div class="signals-header-meta">
-        <div class="meta-stat compact-stat">
+      <div class="signals-ops-meta">
+        <div class="signals-meta-card">
           <span>Results</span>
           <strong>{{ resultLabel }}</strong>
         </div>
-
-        <button class="ghost-button" type="button" @click="hydrateSignals">Refresh</button>
+        <div class="signals-meta-card">
+          <span>High priority</span>
+          <strong>{{ highPriorityCount }}</strong>
+        </div>
+        <div class="signals-meta-card">
+          <span>Pending review</span>
+          <strong>{{ pendingReviewCount }}</strong>
+        </div>
       </div>
     </div>
 
-    <div class="signals-toolbar">
-      <label class="signals-search-field">
-        <span class="eyebrow">Search</span>
-        <input v-model="search" type="search" placeholder="Search by symbol or strategy" />
-      </label>
+    <div class="signals-toolbar-card">
+      <div class="signals-toolbar-top">
+        <label class="signals-search-field">
+          <span class="eyebrow">Search</span>
+          <div class="signals-search-input-shell">
+            <AppIcon name="Search" :size="16" class="signals-search-icon" />
+            <input v-model="search" type="search" placeholder="Search by symbol or strategy" />
+          </div>
+        </label>
 
-      <button v-if="hasActiveFilters" class="ghost-button" type="button" @click="clearFilters">
-        Clear all filters
-      </button>
-    </div>
-
-    <div class="signals-filter-groups">
-      <div class="filter-group">
-        <span class="filter-group-label">Status</span>
-        <button
-          v-for="status in statusOptions"
-          :key="status"
-          class="filter-chip"
-          :class="{ active: selectedStatuses.includes(status) }"
-          type="button"
-          @click="selectedStatuses = toggleMultiValue(selectedStatuses, status)"
-        >
-          {{ formatLabel(status) }}
-        </button>
+        <div class="signals-toolbar-actions">
+          <div class="signals-filter-counter" :class="{ active: hasActiveFilters }">
+            <AppIcon name="SlidersHorizontal" :size="15" />
+            <span>{{ activeFilterCount }} active filters</span>
+          </div>
+          <button v-if="hasActiveFilters" class="ghost-button" type="button" @click="clearFilters">
+            Clear all
+          </button>
+          <button class="ghost-button" type="button" @click="hydrateSignals">Refresh</button>
+        </div>
       </div>
 
-      <div class="filter-group">
-        <span class="filter-group-label">Direction</span>
-        <button
-          v-for="direction in directionOptions"
-          :key="direction"
-          class="filter-chip"
-          :class="{ active: selectedDirections.includes(direction) }"
-          type="button"
-          @click="selectedDirections = toggleMultiValue(selectedDirections, direction)"
-        >
-          {{ formatLabel(direction) }}
-        </button>
-      </div>
+      <div class="signals-filter-groups">
+        <div class="filter-group">
+          <span class="filter-group-label">Status</span>
+          <button
+            v-for="status in statusOptions"
+            :key="status"
+            class="filter-chip"
+            :class="{ active: selectedStatuses.includes(status) }"
+            type="button"
+            @click="selectedStatuses = toggleMultiValue(selectedStatuses, status)"
+          >
+            {{ formatLabel(status) }}
+          </button>
+        </div>
 
-      <div class="filter-group">
-        <span class="filter-group-label">Timeframe</span>
-        <button
-          v-for="timeframe in timeframeOptions"
-          :key="timeframe"
-          class="filter-chip"
-          :class="{ active: selectedTimeframes.includes(timeframe) }"
-          type="button"
-          @click="selectedTimeframes = toggleMultiValue(selectedTimeframes, timeframe)"
-        >
-          {{ timeframe }}
-        </button>
-      </div>
+        <div class="filter-group">
+          <span class="filter-group-label">Direction</span>
+          <button
+            v-for="direction in directionOptions"
+            :key="direction"
+            class="filter-chip"
+            :class="{ active: selectedDirections.includes(direction) }"
+            type="button"
+            @click="selectedDirections = toggleMultiValue(selectedDirections, direction)"
+          >
+            {{ formatLabel(direction) }}
+          </button>
+        </div>
 
-      <div class="filter-group">
-        <span class="filter-group-label">Strategy</span>
-        <button
-          v-for="strategy in strategyOptions"
-          :key="strategy"
-          class="filter-chip"
-          :class="{ active: selectedStrategies.includes(strategy) }"
-          type="button"
-          @click="selectedStrategies = toggleMultiValue(selectedStrategies, strategy)"
-        >
-          {{ strategy }}
-        </button>
-      </div>
+        <div class="filter-group">
+          <span class="filter-group-label">Timeframe</span>
+          <button
+            v-for="timeframe in timeframeOptions"
+            :key="timeframe"
+            class="filter-chip"
+            :class="{ active: selectedTimeframes.includes(timeframe) }"
+            type="button"
+            @click="selectedTimeframes = toggleMultiValue(selectedTimeframes, timeframe)"
+          >
+            {{ timeframe }}
+          </button>
+        </div>
 
-      <div class="filter-group">
-        <span class="filter-group-label">Review priority</span>
-        <button
-          v-for="priority in priorityOptions"
-          :key="priority"
-          class="filter-chip"
-          :class="{ active: selectedPriorities.includes(priority) }"
-          type="button"
-          @click="selectedPriorities = toggleMultiValue(selectedPriorities, priority)"
-        >
-          {{ formatLabel(priority) }}
-        </button>
+        <div class="filter-group">
+          <span class="filter-group-label">Strategy</span>
+          <button
+            v-for="strategy in strategyOptions"
+            :key="strategy"
+            class="filter-chip"
+            :class="{ active: selectedStrategies.includes(strategy) }"
+            type="button"
+            @click="selectedStrategies = toggleMultiValue(selectedStrategies, strategy)"
+          >
+            {{ strategy }}
+          </button>
+        </div>
+
+        <div class="filter-group">
+          <span class="filter-group-label">Review priority</span>
+          <button
+            v-for="priority in priorityOptions"
+            :key="priority"
+            class="filter-chip"
+            :class="{ active: selectedPriorities.includes(priority) }"
+            type="button"
+            @click="selectedPriorities = toggleMultiValue(selectedPriorities, priority)"
+          >
+            {{ formatLabel(priority) }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -423,7 +455,7 @@ onMounted(() => {
       <p class="empty-state-title">Loading persisted signals...</p>
       <p class="empty-state-copy">Preparing the review queue and preserving the final table layout.</p>
       <div class="signals-skeleton-list top-gap">
-        <div v-for="item in 5" :key="item" class="signals-skeleton-row" />
+        <div v-for="item in 6" :key="item" class="signals-skeleton-row" />
       </div>
     </div>
 
@@ -445,87 +477,118 @@ onMounted(() => {
     </div>
 
     <div v-else class="signals-table-layout">
-      <div class="table-shell signals-table-shell">
-        <table>
-          <thead>
-            <tr>
-              <th>
-                <button class="table-sort-button" type="button" @click="setSort('symbol')">Symbol</button>
-              </th>
-              <th>
-                <button class="table-sort-button" type="button" @click="setSort('strategyLabel')">
-                  Strategy
-                </button>
-              </th>
-              <th>Direction</th>
-              <th>Hint</th>
-              <th>Timeframe</th>
-              <th>
-                <button class="table-sort-button" type="button" @click="setSort('status')">Status</button>
-              </th>
-              <th>
-                <button class="table-sort-button" type="button" @click="setSort('score')">Score</button>
-              </th>
-              <th>
-                <button class="table-sort-button" type="button" @click="setSort('confidence')">
-                  Confidence
-                </button>
-              </th>
-              <th>
-                <button class="table-sort-button" type="button" @click="setSort('reviewPriority')">
-                  Review Priority
-                </button>
-              </th>
-              <th>
-                <button class="table-sort-button" type="button" @click="setSort('signalGeneratedAt')">
-                  Generated
-                </button>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="signal in sortedSignals"
-              :key="signal.id"
-              class="signals-data-row"
-              :class="{ selected: selectedSignalId === signal.id }"
-              @click="openSignal(signal)"
-            >
-              <td class="symbol-cell">{{ signal.symbol }}</td>
-              <td>
-                <div class="table-stack-cell">
-                  <strong>{{ signal.strategyLabel }}</strong>
-                  <small>{{ signal.strategyKey }}</small>
-                </div>
-              </td>
-              <td>
-                <StatusBadge :label="formatLabel(signal.direction)" :tone="badgeToneForDirection(signal.direction)" />
-              </td>
-              <td>
-                <StatusBadge :label="formatLabel(signal.executionHint)" tone="neutral" />
-              </td>
-              <td>{{ signal.timeframe }}</td>
-              <td>
-                <StatusBadge :label="formatLabel(signal.status)" :tone="badgeToneForStatus(signal.status)" />
-              </td>
-              <td>{{ signal.score }}</td>
-              <td>{{ signal.confidence }}</td>
-              <td>
-                <StatusBadge
-                  :label="formatLabel(signal.reviewPriority)"
-                  :tone="badgeToneForPriority(signal.reviewPriority)"
-                />
-              </td>
-              <td>{{ formatDate(signal.signalGeneratedAt) }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="signals-table-shell">
+        <div class="signals-table-header-row">
+          <div>
+            <p class="eyebrow">Queue</p>
+            <h3>Prioritized review list</h3>
+          </div>
+          <div class="signals-sort-hint">
+            <AppIcon name="ArrowUpDown" :size="15" />
+            <span>Click column labels to sort</span>
+          </div>
+        </div>
+
+        <div class="table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th>
+                  <button class="table-sort-button" type="button" @click="setSort('symbol')">Symbol</button>
+                </th>
+                <th>
+                  <button class="table-sort-button" type="button" @click="setSort('strategyLabel')">
+                    Strategy
+                  </button>
+                </th>
+                <th>Direction</th>
+                <th>Execution</th>
+                <th>Timeframe</th>
+                <th>
+                  <button class="table-sort-button" type="button" @click="setSort('status')">Status</button>
+                </th>
+                <th>
+                  <button class="table-sort-button" type="button" @click="setSort('score')">Score</button>
+                </th>
+                <th>
+                  <button class="table-sort-button" type="button" @click="setSort('confidence')">
+                    Confidence
+                  </button>
+                </th>
+                <th>
+                  <button class="table-sort-button" type="button" @click="setSort('reviewPriority')">
+                    Review Priority
+                  </button>
+                </th>
+                <th>
+                  <button class="table-sort-button" type="button" @click="setSort('signalGeneratedAt')">
+                    Generated
+                  </button>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="signal in sortedSignals"
+                :key="signal.id"
+                class="signals-data-row"
+                :class="{ selected: selectedSignalId === signal.id }"
+                @click="openSignal(signal)"
+              >
+                <td class="symbol-cell">
+                  <div class="signal-symbol-block">
+                    <strong>{{ signal.symbol }}</strong>
+                    <small>#{{ signal.id.slice(-3) }}</small>
+                  </div>
+                </td>
+                <td>
+                  <div class="table-stack-cell">
+                    <strong>{{ signal.strategyLabel }}</strong>
+                    <small>{{ signal.strategyKey }}</small>
+                  </div>
+                </td>
+                <td>
+                  <StatusBadge :label="formatLabel(signal.direction)" :tone="badgeToneForDirection(signal.direction)" />
+                </td>
+                <td>
+                  <StatusBadge :label="formatLabel(signal.executionHint)" tone="neutral" />
+                </td>
+                <td>{{ signal.timeframe }}</td>
+                <td>
+                  <StatusBadge :label="formatLabel(signal.status)" :tone="badgeToneForStatus(signal.status)" />
+                </td>
+                <td>
+                  <div class="metric-pill">
+                    <span>{{ signal.score }}</span>
+                  </div>
+                </td>
+                <td>
+                  <div class="metric-pill muted">
+                    <span>{{ signal.confidence }}%</span>
+                  </div>
+                </td>
+                <td>
+                  <StatusBadge
+                    :label="formatLabel(signal.reviewPriority)"
+                    :tone="badgeToneForPriority(signal.reviewPriority)"
+                  />
+                </td>
+                <td>
+                  <div class="table-stack-cell compact">
+                    <strong>{{ formatDate(signal.signalGeneratedAt) }}</strong>
+                    <small>review {{ signal.reviewScore }}</small>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <aside v-if="selectedSignal" class="signal-detail-preview">
         <div class="signal-detail-preview-header">
           <div>
-            <p class="eyebrow">Signal detail preview</p>
+            <p class="eyebrow">Detail rail</p>
             <h3>{{ selectedSignal.symbol }} - {{ selectedSignal.strategyLabel }}</h3>
           </div>
           <button class="ghost-button" type="button" @click="selectedSignalId = null">Close</button>
@@ -547,16 +610,16 @@ onMounted(() => {
           />
         </div>
 
-        <div class="signal-preview-metrics">
-          <div class="summary-stat">
+        <div class="signal-preview-hero">
+          <div class="signal-preview-score-card primary">
             <span>Score</span>
             <strong>{{ selectedSignal.score }}</strong>
           </div>
-          <div class="summary-stat">
+          <div class="signal-preview-score-card">
             <span>Confidence</span>
-            <strong>{{ selectedSignal.confidence }}</strong>
+            <strong>{{ selectedSignal.confidence }}%</strong>
           </div>
-          <div class="summary-stat">
+          <div class="signal-preview-score-card">
             <span>Generated</span>
             <strong>{{ formatDate(selectedSignal.signalGeneratedAt) }}</strong>
           </div>
@@ -581,6 +644,20 @@ onMounted(() => {
             <div class="summary-stat">
               <span>Target</span>
               <strong>{{ formatPrice(selectedSignal.targetPrice) }}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="signal-preview-section">
+          <p class="eyebrow">Operator notes</p>
+          <div class="signal-note-list">
+            <div class="signal-note-item">
+              <AppIcon name="ShieldCheck" :size="15" />
+              <span>Status and priority remain visible at all times for fast triage.</span>
+            </div>
+            <div class="signal-note-item">
+              <AppIcon name="ScanSearch" :size="15" />
+              <span>Use the filter bar to isolate strategy clusters or narrow the review queue.</span>
             </div>
           </div>
         </div>
