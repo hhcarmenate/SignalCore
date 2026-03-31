@@ -56,6 +56,8 @@ class TradeSignal extends Model
         'replaces_trade_signal_id',
         'source_run_reference',
         'source_signal_reference',
+        'review_priority',
+        'review_score',
     ];
 
     protected $casts = [
@@ -65,6 +67,7 @@ class TradeSignal extends Model
         'score' => 'decimal:2',
         'confidence' => 'decimal:2',
         'ranking_score' => 'decimal:2',
+        'review_score' => 'decimal:2',
         'ranking_position' => 'integer',
         'score_breakdown' => 'array',
         'indicator_snapshot' => 'array',
