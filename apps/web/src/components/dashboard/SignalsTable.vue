@@ -149,6 +149,11 @@ const pendingReviewCount = computed(
   () => sortedSignals.value.filter((signal) => signal.status === 'pending_review').length,
 )
 const resultLabel = computed(() => `${sortedSignals.value.length} signal${sortedSignals.value.length === 1 ? '' : 's'}`)
+const tableLayoutClass = computed(() =>
+  selectedSignal.value
+    ? 'grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1.9fr)_380px]'
+    : 'grid grid-cols-1 gap-5',
+)
 const activeFilterCount = computed(
   () =>
     Number(search.value.length > 0) +
@@ -460,7 +465,7 @@ onMounted(() => {
       <button class="mt-4 rounded-full border border-white/10 bg-white/8 px-3 py-2 text-sm text-white/85" @click="clearFilters">Clear filters</button>
     </div>
 
-    <div v-else class="grid grid-cols-1 gap-5 2xl:grid-cols-[minmax(0,1.9fr)_380px]">
+    <div v-else :class="tableLayoutClass">
       <section class="overflow-hidden rounded-[24px] border border-white/10 bg-black/15">
         <div class="flex flex-col gap-3 border-b border-white/8 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
