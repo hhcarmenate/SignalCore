@@ -1,16 +1,21 @@
 <?php
 
-use App\Http\Controllers\Api\SymbolController;
-use App\Http\Controllers\Api\WatchlistController;
-use App\Http\Controllers\Api\WatchlistItemController;
+use App\Support\Platform\PlatformHealthCheck;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/symbols', [SymbolController::class, 'index']);
+Route::get('/health', function (PlatformHealthCheck $healthCheck) {
+    $result = $healthCheck->run();
 
-Route::get('/watchlists', [WatchlistController::class, 'index']);
-Route::post('/watchlists', [WatchlistController::class, 'store']);
-Route::get('/watchlists/{watchlist}', [WatchlistController::class, 'show']);
-Route::delete('/watchlists/{watchlist}', [WatchlistController::class, 'destroy']);
+    $statusCode = match ($result['status']) {
+        'healthy' => 200,
+        'degraded' => 200,
+        default => 503,
+    };
 
-Route::post('/watchlists/{watchlist}/items', [WatchlistItemController::class, 'store']);
-Route::delete('/watchlists/{watchlist}/items/{item}', [WatchlistItemController::class, 'destroy']);
+    return response()->json($result, $statusCode);
+});
+
+Route::get('/user', function (Request $request) {
+    return $request->user();
+})->middleware('auth:sanctum');
