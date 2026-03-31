@@ -2,9 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Support\Platform\OperationalLogger;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\Log;
 
 class RunOperationalDiagnosticsJob implements ShouldQueue
 {
@@ -12,9 +12,16 @@ class RunOperationalDiagnosticsJob implements ShouldQueue
 
     public int $tries = 2;
 
-    public function handle(): void
+    public function handle(OperationalLogger $logger): void
     {
-        Log::info('scheduler.job.run_operational_diagnostics.started');
-        Log::info('scheduler.job.run_operational_diagnostics.completed');
+        $logger->warning('scheduler.job.run_operational_diagnostics.started', [
+            'job' => self::class,
+            'queue' => $this->queue,
+        ]);
+
+        $logger->warning('scheduler.job.run_operational_diagnostics.completed', [
+            'job' => self::class,
+            'queue' => $this->queue,
+        ]);
     }
 }
