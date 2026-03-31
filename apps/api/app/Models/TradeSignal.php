@@ -6,6 +6,7 @@ use App\Enums\TradeSignalStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TradeSignal extends Model
 {
@@ -39,6 +40,11 @@ class TradeSignal extends Model
         'invalidated_at',
         'actioned_at',
         'status_reason',
+        'fingerprint',
+        'setup_key',
+        'bar_time',
+        'is_duplicate',
+        'replaces_trade_signal_id',
     ];
 
     protected $casts = [
@@ -58,10 +64,13 @@ class TradeSignal extends Model
         'reviewed_at' => 'immutable_datetime',
         'invalidated_at' => 'immutable_datetime',
         'actioned_at' => 'immutable_datetime',
+        'bar_time' => 'immutable_datetime',
+        'is_duplicate' => 'boolean',
     ];
 
     protected $attributes = [
         'status' => TradeSignalStatus::New->value,
+        'is_duplicate' => false,
     ];
 
     public function watchlist(): BelongsTo
@@ -77,5 +86,15 @@ class TradeSignal extends Model
     public function scannerStrategy(): BelongsTo
     {
         return $this->belongsTo(ScannerStrategy::class);
+    }
+
+    public function replacedSignal(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'replaces_trade_signal_id');
+    }
+
+    public function replacements(): HasMany
+    {
+        return $this->hasMany(self::class, 'replaces_trade_signal_id');
     }
 }
