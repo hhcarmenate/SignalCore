@@ -3,7 +3,7 @@
 Environment variable templates for API, web, and scanner services.
 
 ## Purpose
-This directory is reserved for non-secret environment templates and service-level config contracts.
+This directory contains non-secret environment templates and service-level config contracts.
 
 ## Rules
 - safe templates/examples only
@@ -11,10 +11,12 @@ This directory is reserved for non-secret environment templates and service-leve
 - document required keys and ownership clearly
 - local secret values should stay outside tracked repository files
 
-## Service areas
-- `infra/env/api/`
-- `infra/env/web/`
-- `infra/env/scanner/`
+## Service templates
+- `infra/env/api/.env.example`
+- `infra/env/web/.env.example`
+- `infra/env/scanner/.env.example`
 
 ## Current baseline
-Repository-level `.env.example` remains the current shared starting point until service-specific templates are introduced.
+- root `.env.example` -> shared local stack defaults
+- `apps/api/.env.example` -> Laravel-specific application defaults
+- `infra/env/*/.env.example` -> service ownership and template references
