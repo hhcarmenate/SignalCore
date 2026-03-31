@@ -11,3 +11,8 @@ Schedule::command('platform:scheduler-tick')
     ->everyFiveMinutes()
     ->withoutOverlapping()
     ->runInBackground();
+
+Schedule::command('platform:log-diagnostic')
+    ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground();

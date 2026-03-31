@@ -2,9 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Support\Platform\OperationalLogger;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\Log;
 
 class RefreshAnalyticsJob implements ShouldQueue
 {
@@ -12,9 +12,16 @@ class RefreshAnalyticsJob implements ShouldQueue
 
     public int $tries = 3;
 
-    public function handle(): void
+    public function handle(OperationalLogger $logger): void
     {
-        Log::info('scheduler.job.refresh_analytics.started');
-        Log::info('scheduler.job.refresh_analytics.completed');
+        $logger->info('scheduler.job.refresh_analytics.started', [
+            'job' => self::class,
+            'queue' => $this->queue,
+        ]);
+
+        $logger->info('scheduler.job.refresh_analytics.completed', [
+            'job' => self::class,
+            'queue' => $this->queue,
+        ]);
     }
 }

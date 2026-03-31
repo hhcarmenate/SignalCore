@@ -2,9 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Support\Platform\OperationalLogger;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\Log;
 
 class SyncOptionsMarketDataJob implements ShouldQueue
 {
@@ -12,9 +12,16 @@ class SyncOptionsMarketDataJob implements ShouldQueue
 
     public int $tries = 5;
 
-    public function handle(): void
+    public function handle(OperationalLogger $logger): void
     {
-        Log::info('scheduler.job.sync_options_market_data.started');
-        Log::info('scheduler.job.sync_options_market_data.completed');
+        $logger->info('scheduler.job.sync_options_market_data.started', [
+            'job' => self::class,
+            'queue' => $this->queue,
+        ]);
+
+        $logger->info('scheduler.job.sync_options_market_data.completed', [
+            'job' => self::class,
+            'queue' => $this->queue,
+        ]);
     }
 }

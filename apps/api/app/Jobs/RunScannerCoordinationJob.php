@@ -2,9 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Support\Platform\OperationalLogger;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\Log;
 
 class RunScannerCoordinationJob implements ShouldQueue
 {
@@ -12,9 +12,16 @@ class RunScannerCoordinationJob implements ShouldQueue
 
     public int $tries = 3;
 
-    public function handle(): void
+    public function handle(OperationalLogger $logger): void
     {
-        Log::info('scheduler.job.run_scanner_coordination.started');
-        Log::info('scheduler.job.run_scanner_coordination.completed');
+        $logger->info('scheduler.job.run_scanner_coordination.started', [
+            'job' => self::class,
+            'queue' => $this->queue,
+        ]);
+
+        $logger->info('scheduler.job.run_scanner_coordination.completed', [
+            'job' => self::class,
+            'queue' => $this->queue,
+        ]);
     }
 }

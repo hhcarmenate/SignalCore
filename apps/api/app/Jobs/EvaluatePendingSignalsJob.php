@@ -2,9 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Support\Platform\OperationalLogger;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\Log;
 
 class EvaluatePendingSignalsJob implements ShouldQueue
 {
@@ -12,9 +12,16 @@ class EvaluatePendingSignalsJob implements ShouldQueue
 
     public int $tries = 3;
 
-    public function handle(): void
+    public function handle(OperationalLogger $logger): void
     {
-        Log::info('scheduler.job.evaluate_pending_signals.started');
-        Log::info('scheduler.job.evaluate_pending_signals.completed');
+        $logger->info('scheduler.job.evaluate_pending_signals.started', [
+            'job' => self::class,
+            'queue' => $this->queue,
+        ]);
+
+        $logger->info('scheduler.job.evaluate_pending_signals.completed', [
+            'job' => self::class,
+            'queue' => $this->queue,
+        ]);
     }
 }
