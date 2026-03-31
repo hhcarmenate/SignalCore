@@ -43,6 +43,9 @@ class TradeSignal extends Model
         'queued_for_review_at',
         'review_summary',
         'review_notes',
+        'notification_priority',
+        'should_notify',
+        'notified_at',
         'fingerprint',
         'setup_key',
         'bar_time',
@@ -69,12 +72,15 @@ class TradeSignal extends Model
         'invalidated_at' => 'immutable_datetime',
         'actioned_at' => 'immutable_datetime',
         'queued_for_review_at' => 'immutable_datetime',
+        'notified_at' => 'immutable_datetime',
         'bar_time' => 'immutable_datetime',
+        'should_notify' => 'boolean',
         'is_duplicate' => 'boolean',
     ];
 
     protected $attributes = [
         'status' => TradeSignalStatus::New->value,
+        'should_notify' => false,
         'is_duplicate' => false,
     ];
 
