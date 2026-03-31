@@ -5,8 +5,8 @@ import SignalsTable from '../components/dashboard/SignalsTable.vue'
 
 <template>
   <section class="content-grid single-column-grid">
-    <BaseCard>
-      <SignalsTable />
+    <BaseCard class="section-card">
+      <SignalsTable mode="full" />
     </BaseCard>
   </section>
 </template>
