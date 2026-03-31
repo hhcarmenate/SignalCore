@@ -51,4 +51,9 @@ class Symbol extends Model
     {
         return $this->hasMany(WatchlistItem::class);
     }
+
+    public function optionContracts(): HasMany
+    {
+        return $this->hasMany(OptionContract::class, 'underlying_symbol_id');
+    }
 }
