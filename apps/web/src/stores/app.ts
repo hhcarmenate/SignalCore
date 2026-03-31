@@ -114,6 +114,34 @@ export interface BotRun {
   duration: string
 }
 
+export type ScannerRunStatus = 'completed' | 'completed_with_errors' | 'failed'
+
+export interface ScannerRunEvent {
+  id: string
+  label: string
+  detail: string
+  occurredAt: string
+  tone?: 'success' | 'warning' | 'danger' | 'neutral'
+}
+
+export interface ScannerRunRecord {
+  id: string
+  runReference: string
+  watchlist: string
+  timeframe: string
+  status: ScannerRunStatus
+  symbolsScannedCount: number
+  strategiesExecutedCount: number
+  signalsFoundCount: number
+  errorCount: number
+  startedAt: string
+  completedAt: string
+  duration: string
+  triggerType: string
+  errorSummary?: string
+  lifecycleEvents: ScannerRunEvent[]
+}
+
 export interface KpiItem {
   label: string
   value: string
@@ -866,6 +894,91 @@ export const useAppStore = defineStore('app', () => {
     },
   ])
 
+  const scannerRuns = ref<ScannerRunRecord[]>([
+    {
+      id: 'scan_run_001',
+      runReference: 'run_2026_03_31_4h_tc_01',
+      watchlist: 'Core Momentum',
+      timeframe: '4H',
+      status: 'completed',
+      symbolsScannedCount: 17,
+      strategiesExecutedCount: 3,
+      signalsFoundCount: 4,
+      errorCount: 0,
+      startedAt: '2026-03-31T11:30:00Z',
+      completedAt: '2026-03-31T11:30:12Z',
+      duration: '12.4s',
+      triggerType: 'scheduler',
+      errorSummary: 'No tracked execution issues.',
+      lifecycleEvents: [
+        { id: 'run1_evt1', label: 'Run queued', detail: 'Scheduler triggered the 4H scan window.', occurredAt: '2026-03-31T11:29:58Z', tone: 'neutral' },
+        { id: 'run1_evt2', label: 'Execution completed', detail: 'All strategy targets executed successfully.', occurredAt: '2026-03-31T11:30:12Z', tone: 'success' },
+      ],
+    },
+    {
+      id: 'scan_run_002',
+      runReference: 'run_2026_03_31_1d_bc_01',
+      watchlist: 'Index Leaders',
+      timeframe: '1D',
+      status: 'completed_with_errors',
+      symbolsScannedCount: 12,
+      strategiesExecutedCount: 2,
+      signalsFoundCount: 2,
+      errorCount: 1,
+      startedAt: '2026-03-31T10:00:00Z',
+      completedAt: '2026-03-31T10:00:09Z',
+      duration: '9.1s',
+      triggerType: 'scheduler',
+      errorSummary: 'One symbol failed normalization during persistence handoff.',
+      lifecycleEvents: [
+        { id: 'run2_evt1', label: 'Run queued', detail: 'Daily breakout scan started from the scheduler.', occurredAt: '2026-03-31T09:59:58Z', tone: 'neutral' },
+        { id: 'run2_evt2', label: 'Partial error', detail: 'One symbol response failed validation and was skipped.', occurredAt: '2026-03-31T10:00:06Z', tone: 'warning' },
+        { id: 'run2_evt3', label: 'Run completed', detail: 'Scanner finished with one tracked warning.', occurredAt: '2026-03-31T10:00:09Z', tone: 'warning' },
+      ],
+    },
+    {
+      id: 'scan_run_003',
+      runReference: 'run_2026_03_31_4h_mr_01',
+      watchlist: 'High Beta Shorts',
+      timeframe: '4H',
+      status: 'failed',
+      symbolsScannedCount: 17,
+      strategiesExecutedCount: 1,
+      signalsFoundCount: 0,
+      errorCount: 3,
+      startedAt: '2026-03-31T08:15:00Z',
+      completedAt: '2026-03-31T08:15:14Z',
+      duration: '14.8s',
+      triggerType: 'manual rerun',
+      errorSummary: 'Provider retry budget exhausted and run terminated before completion.',
+      lifecycleEvents: [
+        { id: 'run3_evt1', label: 'Manual rerun', detail: 'Operator retriggered the failed bearish scan window.', occurredAt: '2026-03-31T08:14:58Z', tone: 'neutral' },
+        { id: 'run3_evt2', label: 'Provider failure', detail: 'Repeated upstream fetch failures hit the retry ceiling.', occurredAt: '2026-03-31T08:15:10Z', tone: 'danger' },
+        { id: 'run3_evt3', label: 'Run failed', detail: 'Run stopped before all target symbols could finish.', occurredAt: '2026-03-31T08:15:14Z', tone: 'danger' },
+      ],
+    },
+    {
+      id: 'scan_run_004',
+      runReference: 'run_2026_03_30_4h_tc_04',
+      watchlist: 'Core Momentum',
+      timeframe: '4H',
+      status: 'completed',
+      symbolsScannedCount: 17,
+      strategiesExecutedCount: 3,
+      signalsFoundCount: 3,
+      errorCount: 0,
+      startedAt: '2026-03-30T19:30:00Z',
+      completedAt: '2026-03-30T19:30:11Z',
+      duration: '11.1s',
+      triggerType: 'scheduler',
+      errorSummary: 'Healthy run with no anomalies.',
+      lifecycleEvents: [
+        { id: 'run4_evt1', label: 'Run queued', detail: 'Scheduled 4H trend scan started on time.', occurredAt: '2026-03-30T19:29:58Z', tone: 'neutral' },
+        { id: 'run4_evt2', label: 'Run completed', detail: 'Signal persistence completed without warnings.', occurredAt: '2026-03-30T19:30:11Z', tone: 'success' },
+      ],
+    },
+  ])
+
   const notifications = ref<string[]>([
     'New high-confidence signal detected for NVDA on 4H.',
     'Mean Reversion bot completed with one low-confidence candidate.',
@@ -887,6 +1000,8 @@ export const useAppStore = defineStore('app', () => {
   ])
 
   const findSignalById = (signalId: string) => persistedSignals.value.find((signal) => signal.id === signalId) ?? null
+  const findScannerRunByReference = (runReference: string) =>
+    scannerRuns.value.find((run) => run.runReference === runReference) ?? null
 
   return {
     navigation,
@@ -894,9 +1009,11 @@ export const useAppStore = defineStore('app', () => {
     persistedSignals,
     topSignals,
     botRuns,
+    scannerRuns,
     notifications,
     watchlistSnapshot,
     dashboardKpis,
     findSignalById,
+    findScannerRunByReference,
   }
 })
