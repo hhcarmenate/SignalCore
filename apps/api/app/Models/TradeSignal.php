@@ -54,6 +54,8 @@ class TradeSignal extends Model
         'bar_time',
         'is_duplicate',
         'replaces_trade_signal_id',
+        'source_run_reference',
+        'source_signal_reference',
     ];
 
     protected $casts = [
